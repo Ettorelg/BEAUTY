@@ -15,10 +15,17 @@ export function LoginForm() {
     setPending(true);
     setError(undefined);
     const data = new FormData(event.currentTarget);
-    const result = await authClient.signIn.email({
-      email: String(data.get("email")),
-      password: String(data.get("password")),
-    });
+    let result;
+    try {
+      result = await authClient.signIn.email({
+        email: String(data.get("email")),
+        password: String(data.get("password")),
+      });
+    } catch {
+      setError("Servizio temporaneamente non disponibile. Riprova tra poco.");
+      setPending(false);
+      return;
+    }
 
     if (result.error) {
       setError("Email o password non corretti.");
