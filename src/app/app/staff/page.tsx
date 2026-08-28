@@ -6,7 +6,8 @@ import { formatMinutes } from "@/modules/availability/domain/time-slots";
 import { AppNav } from "../app-nav";
 import { addAbsence, addWorkingHours, assignCategory, assignService, createStaffMember } from "./actions";
 
-const weekdays = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
+const weekdays = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
+const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
 
 export default async function StaffPage() {
   const context = await requireBusinessContext();

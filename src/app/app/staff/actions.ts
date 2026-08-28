@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { serviceCategories, services, staffAbsences, staffMembers, staffServices, workingHours } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { parseTimeToMinutes } from "@/modules/availability/domain/time-slots";
+const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
 
 function ownerOnly(role: string) { if (role !== "OWNER") throw new Error("Operazione riservata al titolare."); }
 
@@ -52,6 +53,7 @@ export async function addWorkingHours(formData: FormData) {
     .parse({ staffId: formData.get("staffId"), weekday: formData.get("weekday"), start: formData.get("start"), end: formData.get("end") });
   const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.id, input.staffId), eq(staffMembers.businessId, context.businessId))).limit(1);
   if (!staff) throw new Error("Operatore non valido.");
+  input.weekday = weekdayValues[input.weekday];
   const startMinutes = parseTimeToMinutes(input.start); const endMinutes = parseTimeToMinutes(input.end);
   if (endMinutes <= startMinutes) throw new Error("La fine del turno deve essere successiva all’inizio.");
   await db.insert(workingHours).values({ businessId: context.businessId, staffId: input.staffId, weekday: input.weekday, startMinutes, endMinutes });
