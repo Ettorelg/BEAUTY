@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { services, staffAbsences, staffMembers, staffServices, workingHours } from "@/db/schema";
+import { serviceCategories, services, staffAbsences, staffMembers, staffServices, workingHours } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { parseTimeToMinutes } from "@/modules/availability/domain/time-slots";
 
@@ -26,6 +26,23 @@ export async function assignService(formData: FormData) {
   const [service] = await db.select({ id: services.id }).from(services).where(and(eq(services.id, input.serviceId), eq(services.businessId, context.businessId))).limit(1);
   if (!staff || !service) throw new Error("Operatore o servizio non valido.");
   await db.insert(staffServices).values({ ...input, businessId: context.businessId }).onConflictDoNothing();
+  revalidatePath("/app/staff");
+}
+
+export async function assignCategory(formData: FormData) {
+  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const input = z.object({ staffId: z.string().uuid(), categoryId: z.string().uuid() })
+    .parse({ staffId: formData.get("staffId"), categoryId: formData.get("categoryId") });
+  const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers)
+    .where(and(eq(staffMembers.id, input.staffId), eq(staffMembers.businessId, context.businessId))).limit(1);
+  const [category] = await db.select({ id: serviceCategories.id }).from(serviceCategories)
+    .where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.businessId, context.businessId), eq(serviceCategories.active, true))).limit(1);
+  if (!staff || !category) throw new Error("Operatore o categoria non valida.");
+  const categoryServices = await db.select({ id: services.id }).from(services)
+    .where(and(eq(services.businessId, context.businessId), eq(services.categoryId, input.categoryId), eq(services.active, true)));
+  if (categoryServices.length) {
+    await db.insert(staffServices).values(categoryServices.map((service) => ({ staffId: staff.id, serviceId: service.id, businessId: context.businessId }))).onConflictDoNothing();
+  }
   revalidatePath("/app/staff");
 }
 
