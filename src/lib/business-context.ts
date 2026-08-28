@@ -14,6 +14,7 @@ export async function requireBusinessContext() {
     .select({
       businessId: businesses.id,
       businessName: businesses.name,
+      timezone: businesses.timezone,
       locationId: locations.id,
       locationName: locations.name,
       role: businessMemberships.role,

@@ -10,7 +10,7 @@ export function AppNav({ businessName, role }: { businessName: string; role: str
       </header>
       <nav className="app-nav" aria-label="Navigazione gestionale">
         <Link href="/app">Dashboard</Link>
-        <span>Agenda</span>
+        <Link href="/app/agenda">Agenda</Link>
         <Link href="/app/services">Servizi</Link>
         <Link href="/app/staff">Staff</Link>
         <span>Clienti</span>
