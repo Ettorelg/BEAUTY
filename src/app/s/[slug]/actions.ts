@@ -1,0 +1,45 @@
+"use server";
+
+import { and, eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { db } from "@/db/client";
+import { appointmentEvents, appointments, businesses, customerRelations, locations, services, staffMembers, staffServices } from "@/db/schema";
+import { getPublicAvailability } from "@/modules/availability/application/public-availability";
+import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
+
+const schema = z.object({ slug: z.string().min(1), serviceId: z.string().uuid(), selection: z.string().transform((value, ctx) => {
+  const [staffId, startsAt] = value.split("|");
+  if (!z.string().uuid().safeParse(staffId).success || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(startsAt ?? "")) { ctx.addIssue({ code: "custom", message: "Slot non valido." }); return z.NEVER; }
+  return { staffId, startsAt };
+}),
+  customerName: z.string().trim().min(2).max(100), email: z.string().trim().email(), phone: z.string().trim().max(30).optional(), idempotencyKey: z.string().uuid() });
+
+export async function createPublicAppointment(formData: FormData) {
+  const input = schema.parse(Object.fromEntries(formData));
+  const { staffId, startsAt: localStart } = input.selection;
+  const [selection] = await db.select({ businessId: businesses.id, timezone: businesses.timezone, locationId: locations.id,
+    serviceName: services.name, duration: services.durationMinutes, price: services.price })
+    .from(businesses).innerJoin(locations, eq(locations.businessId, businesses.id))
+    .innerJoin(services, and(eq(services.businessId, businesses.id), eq(services.id, input.serviceId), eq(services.active, true), eq(services.onlineBookable, true)))
+    .innerJoin(staffServices, and(eq(staffServices.businessId, businesses.id), eq(staffServices.serviceId, services.id), eq(staffServices.staffId, staffId)))
+    .innerJoin(staffMembers, and(eq(staffMembers.id, staffId), eq(staffMembers.businessId, businesses.id), eq(staffMembers.active, true)))
+    .where(eq(businesses.slug, input.slug)).limit(1);
+  if (!selection) throw new Error("Prenotazione non valida.");
+  const date = localStart.slice(0, 10);
+  const slots = await getPublicAvailability({ businessId: selection.businessId, serviceId: input.serviceId, date, durationMinutes: selection.duration, timezone: selection.timezone });
+  if (!slots.some((slot) => slot.staffId === staffId && slot.localStart === localStart)) throw new Error("Lo slot non è più disponibile.");
+  const startsAt = zonedLocalToUtc(localStart, selection.timezone);
+
+  await db.transaction(async (tx) => {
+    const email = input.email.toLowerCase();
+    const [known] = await tx.select({ id: customerRelations.id }).from(customerRelations).where(and(eq(customerRelations.businessId, selection.businessId), eq(customerRelations.email, email))).limit(1);
+    const customerId = known?.id ?? (await tx.insert(customerRelations).values({ businessId: selection.businessId, name: input.customerName, email, phone: input.phone || null }).returning({ id: customerRelations.id }))[0].id;
+    const [created] = await tx.insert(appointments).values({ businessId: selection.businessId, locationId: selection.locationId, customerRelationId: customerId,
+      staffId, serviceId: input.serviceId, serviceName: selection.serviceName, durationMinutes: selection.duration, price: selection.price,
+      startsAt, endsAt: new Date(startsAt.getTime() + selection.duration * 60_000), timezone: selection.timezone, source: "PUBLIC", idempotencyKey: input.idempotencyKey })
+      .onConflictDoNothing({ target: [appointments.businessId, appointments.idempotencyKey] }).returning({ id: appointments.id });
+    if (created) await tx.insert(appointmentEvents).values({ appointmentId: created.id, businessId: selection.businessId, type: "CREATED", toStatus: "BOOKED" });
+  });
+  redirect(`/s/${input.slug}/conferma`);
+}

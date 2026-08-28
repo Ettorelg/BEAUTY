@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default async function ConfirmationPage({ params }: { params: Promise<{ slug: string }> }) { const { slug } = await params; return <main className="auth-shell"><section className="auth-card confirmation-card"><p className="confirmation-mark">✓</p><p className="eyebrow">Prenotazione ricevuta</p><h1>A presto.</h1><p className="muted">Il tuo appuntamento è stato registrato. Conserva questa pagina come conferma.</p><Link className="ghost-button link-button" href={`/s/${slug}`}>Torna al salone</Link></section></main>; }
