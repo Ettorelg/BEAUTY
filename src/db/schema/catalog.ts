@@ -86,6 +86,7 @@ export const workingHours = pgTable(
   (table) => [
     index("working_hours_staff_weekday_idx").on(table.staffId, table.weekday),
     index("working_hours_business_idx").on(table.businessId),
+    uniqueIndex("working_hours_staff_slot_unique").on(table.businessId, table.staffId, table.weekday, table.startMinutes, table.endMinutes),
   ],
 );
 

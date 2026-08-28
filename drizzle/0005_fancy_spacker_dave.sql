@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "working_hours_staff_slot_unique" ON "working_hours" USING btree ("business_id","staff_id","weekday","start_minutes","end_minutes");
