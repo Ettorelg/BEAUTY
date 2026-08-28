@@ -15,6 +15,13 @@
       "when": 1787931005694,
       "tag": "0001_fearless_junta",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787954011712,
+      "tag": "0002_hard_dreaming_celestial",
+      "breakpoints": true
     }
   ]
 }
