@@ -19,7 +19,7 @@ export default async function ServicesPage() {
     <AppNav businessName={context.businessName} role={context.role} />
     <div className="page-heading"><div><p className="eyebrow">Catalogo</p><h1>Servizi</h1></div><p className="muted">Il listino alimenterà sito pubblico e prenotazioni.</p></div>
     <section className="management-grid">
-      <article className="panel"><h2>Nuova categoria</h2><form action={createCategory} className="compact-form"><input name="name" placeholder="Es. Capelli" required minLength={2}/><button className="primary-button">Aggiungi</button></form></article>
+      <article className="panel"><h2>Nuova categoria</h2><form action={createCategory} className="compact-form"><input name="name" placeholder="Es. Capelli" required minLength={2}/><button className="primary-button">Aggiungi</button></form><div className="category-list"><p className="eyebrow">Categorie inserite</p>{categories.length ? <div className="category-chips">{categories.map(category => <span className="category-chip" key={category.id}>{category.name}</span>)}</div> : <p className="muted">Nessuna categoria ancora.</p>}</div></article>
       <article className="panel"><h2>Nuovo servizio</h2>{categories.length ? <form action={createService} className="compact-form stacked">
         <select name="categoryId" required>{categories.map(c => <option value={c.id} key={c.id}>{c.name}</option>)}</select>
         <input name="name" placeholder="Nome servizio" required minLength={2}/><input name="description" placeholder="Descrizione breve" maxLength={180}/>

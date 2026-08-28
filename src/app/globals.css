@@ -86,6 +86,10 @@ button { cursor: pointer; }
 .panel h2, .list-section h2 { margin-top: 0; }
 .compact-form { display: flex; gap: 10px; }
 .category-assignment { margin-top: 18px; padding-top: 18px; border-top: 1px solid #eee7e3; }
+.category-list { margin-top: 22px; padding-top: 16px; border-top: 1px solid #eee7e3; }
+.category-list .eyebrow { margin: 0 0 9px; font-size: .68rem; }
+.category-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.category-chip { padding: 7px 11px; border: 1px solid #d8cec8; border-radius: 999px; background: #faf8f6; font-size: .86rem; }
 .compact-form.stacked { display: grid; }
 .compact-form input, .compact-form select { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid #d8cec8; border-radius: 10px; background: white; }
 .compact-form label { display: grid; gap: 6px; color: #5f554f; font-size: .84rem; font-weight: 700; }
