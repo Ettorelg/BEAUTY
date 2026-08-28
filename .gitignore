@@ -1,0 +1,9 @@
+node_modules/
+.pnpm-store/
+.next/
+coverage/
+.env
+.env.local
+*.tsbuildinfo
+.docx_import_qa/
+.tools/
