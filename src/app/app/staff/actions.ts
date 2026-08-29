@@ -4,8 +4,9 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { appointments, serviceCategories, services, staffAbsences, staffMembers, staffServices, workingHours } from "@/db/schema";
+import { appointments, businessMemberships, serviceCategories, services, staffAbsences, staffInvitations, staffMembers, staffServices, workingHours } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
+import { issueStaffInvitation } from "@/lib/staff-invitations";
 import { parseTimeToMinutes } from "@/modules/availability/domain/time-slots";
 
 const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
@@ -21,9 +22,26 @@ function refreshStaffPages() {
 
 export async function createStaffMember(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
-  const input = z.object({ name: z.string().trim().min(2).max(100), title: z.string().trim().max(80).optional() })
-    .parse({ name: formData.get("name"), title: formData.get("title") || undefined });
-  await db.insert(staffMembers).values({ businessId: context.businessId, locationId: context.locationId, ...input });
+  const input = z.object({
+    name: z.string().trim().min(2).max(100),
+    title: z.string().trim().max(80).optional(),
+    email: z.string().trim().email().optional(),
+  }).parse({ name: formData.get("name"), title: formData.get("title") || undefined, email: formData.get("email") || undefined });
+  const [created] = await db.insert(staffMembers).values({ businessId: context.businessId, locationId: context.locationId, name: input.name, title: input.title })
+    .returning({ id: staffMembers.id });
+  if (input.email) await issueStaffInvitation({ businessId: context.businessId, businessName: context.businessName, staffId: created.id, email: input.email, createdBy: context.user.id });
+  refreshStaffPages();
+}
+
+export async function inviteStaffMember(formData: FormData) {
+  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const input = z.object({ staffId: z.string().uuid(), email: z.string().trim().email() })
+    .parse({ staffId: formData.get("staffId"), email: formData.get("email") });
+  const [staff] = await db.select({ id: staffMembers.id, userId: staffMembers.userId }).from(staffMembers)
+    .where(and(eq(staffMembers.id, input.staffId), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).limit(1);
+  if (!staff) throw new Error("Operatore non valido.");
+  if (staff.userId) throw new Error("Questo operatore possiede già un account collegato.");
+  await issueStaffInvitation({ businessId: context.businessId, businessName: context.businessName, staffId: staff.id, email: input.email, createdBy: context.user.id });
   refreshStaffPages();
 }
 
@@ -32,17 +50,10 @@ export async function createOwnerStaffProfile() {
   const [existing] = await db.select({ id: staffMembers.id }).from(staffMembers)
     .where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.userId, context.user.id))).limit(1);
   if (existing) {
-    await db.update(staffMembers).set({ active: true, locationId: context.locationId, updatedAt: new Date() })
-      .where(eq(staffMembers.id, existing.id));
+    await db.update(staffMembers).set({ active: true, locationId: context.locationId, updatedAt: new Date() }).where(eq(staffMembers.id, existing.id));
   } else {
     const name = context.user.name?.trim() || context.user.email.split("@")[0];
-    await db.insert(staffMembers).values({
-      businessId: context.businessId,
-      locationId: context.locationId,
-      userId: context.user.id,
-      name,
-      title: "Titolare",
-    });
+    await db.insert(staffMembers).values({ businessId: context.businessId, locationId: context.locationId, userId: context.user.id, name, title: "Titolare" });
   }
   refreshStaffPages();
 }
@@ -60,11 +71,18 @@ export async function deleteStaffMember(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const id = z.string().uuid().parse(formData.get("id"));
   await db.transaction(async (tx) => {
+    const [member] = await tx.select({ userId: staffMembers.userId }).from(staffMembers)
+      .where(and(eq(staffMembers.id, id), eq(staffMembers.businessId, context.businessId))).limit(1);
     const [linkedAppointment] = await tx.select({ id: appointments.id }).from(appointments)
       .where(and(eq(appointments.staffId, id), eq(appointments.businessId, context.businessId))).limit(1);
     await tx.delete(staffServices).where(and(eq(staffServices.staffId, id), eq(staffServices.businessId, context.businessId)));
     await tx.delete(workingHours).where(and(eq(workingHours.staffId, id), eq(workingHours.businessId, context.businessId)));
     await tx.delete(staffAbsences).where(and(eq(staffAbsences.staffId, id), eq(staffAbsences.businessId, context.businessId)));
+    if (member?.userId) await tx.delete(businessMemberships).where(and(
+      eq(businessMemberships.businessId, context.businessId),
+      eq(businessMemberships.userId, member.userId),
+      eq(businessMemberships.role, "STAFF"),
+    ));
     if (linkedAppointment) {
       await tx.update(staffMembers).set({ active: false, updatedAt: new Date() })
         .where(and(eq(staffMembers.id, id), eq(staffMembers.businessId, context.businessId)));
