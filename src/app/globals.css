@@ -37,7 +37,7 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 
 .button-row { display: flex; gap: 12px; margin-top: 28px; }
-.primary-button, .ghost-button {
+.primary-button, .ghost-button, .danger-button {
   min-height: 46px;
   border-radius: 12px;
   padding: 12px 18px;
@@ -45,6 +45,8 @@ button { cursor: pointer; }
 }
 .primary-button { border: 1px solid var(--accent); background: var(--accent); color: white; }
 .ghost-button { border: 1px solid #d8cec8; background: white; color: var(--foreground); }
+.danger-button { border: 1px solid #c84b4b; background: white; color: #a12d2d; }
+.danger-button:hover { background: #fff2f2; }
 .link-button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .primary-button:disabled { cursor: wait; opacity: .65; }
 
@@ -114,6 +116,17 @@ button { cursor: pointer; }
 .data-row h3, .data-row p { margin: 0 0 6px; }
 .data-row .eyebrow { font-size: .7rem; }
 .empty-state { padding: 32px; border: 1px dashed #cdbfb7; border-radius: 16px; color: #756a65; text-align: center; }
+.staff-row { align-items: flex-start; }
+.staff-card-main { min-width: 0; flex: 1; }
+.staff-services { display: grid; gap: 9px; margin: 18px 0; }
+.staff-services > p { margin: 0; }
+.assignment-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.assignment-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 7px 6px 11px; border: 1px solid #d8cec8; border-radius: 999px; background: #faf8f6; font-size: .84rem; }
+.assignment-remove { min-height: 28px; border: 0; border-radius: 999px; padding: 4px 8px; background: #f1dede; color: #912f2f; font-size: .74rem; font-weight: 700; }
+.edit-disclosure { margin-top: 18px; border-top: 1px solid #eee7e3; padding-top: 14px; }
+.edit-disclosure summary { color: var(--accent); cursor: pointer; font-weight: 700; }
+.edit-disclosure .compact-form { margin-top: 14px; max-width: 520px; }
+.delete-form { flex: 0 0 auto; }
 
 .public-shell { width: min(1180px, calc(100% - 32px)); padding-top: 28px; }
 .public-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 24px; }
@@ -159,6 +172,8 @@ button { cursor: pointer; }
   .management-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
   .compact-form:not(.stacked) { display: grid; }
+  .delete-form { width: 100%; }
+  .delete-form .danger-button { width: 100%; }
   .public-header, .customer-account-header { align-items: flex-start; display: grid; gap: 18px; }
   .public-account-actions { align-items: flex-start; flex-direction: column; }
   .public-hero { min-height: 320px; padding: 28px; }
