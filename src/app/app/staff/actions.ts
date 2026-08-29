@@ -27,6 +27,26 @@ export async function createStaffMember(formData: FormData) {
   refreshStaffPages();
 }
 
+export async function createOwnerStaffProfile() {
+  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const [existing] = await db.select({ id: staffMembers.id }).from(staffMembers)
+    .where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.userId, context.user.id))).limit(1);
+  if (existing) {
+    await db.update(staffMembers).set({ active: true, locationId: context.locationId, updatedAt: new Date() })
+      .where(eq(staffMembers.id, existing.id));
+  } else {
+    const name = context.user.name?.trim() || context.user.email.split("@")[0];
+    await db.insert(staffMembers).values({
+      businessId: context.businessId,
+      locationId: context.locationId,
+      userId: context.user.id,
+      name,
+      title: "Titolare",
+    });
+  }
+  refreshStaffPages();
+}
+
 export async function updateStaffMember(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const input = z.object({ id: z.string().uuid(), name: z.string().trim().min(2).max(100), title: z.string().trim().max(80).optional() })
@@ -70,11 +90,7 @@ export async function removeAssignedService(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const input = z.object({ staffId: z.string().uuid(), serviceId: z.string().uuid() })
     .parse({ staffId: formData.get("staffId"), serviceId: formData.get("serviceId") });
-  await db.delete(staffServices).where(and(
-    eq(staffServices.staffId, input.staffId),
-    eq(staffServices.serviceId, input.serviceId),
-    eq(staffServices.businessId, context.businessId),
-  ));
+  await db.delete(staffServices).where(and(eq(staffServices.staffId, input.staffId), eq(staffServices.serviceId, input.serviceId), eq(staffServices.businessId, context.businessId)));
   refreshStaffPages();
 }
 
@@ -89,9 +105,7 @@ export async function assignCategory(formData: FormData) {
   if (!staff || !category) throw new Error("Operatore o categoria non valida.");
   const categoryServices = await db.select({ id: services.id }).from(services)
     .where(and(eq(services.businessId, context.businessId), eq(services.categoryId, input.categoryId), eq(services.active, true)));
-  if (categoryServices.length) {
-    await db.insert(staffServices).values(categoryServices.map((service) => ({ staffId: staff.id, serviceId: service.id, businessId: context.businessId }))).onConflictDoNothing();
-  }
+  if (categoryServices.length) await db.insert(staffServices).values(categoryServices.map((service) => ({ staffId: staff.id, serviceId: service.id, businessId: context.businessId }))).onConflictDoNothing();
   refreshStaffPages();
 }
 

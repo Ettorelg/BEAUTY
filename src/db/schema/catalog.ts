@@ -1,4 +1,5 @@
 import { boolean, index, integer, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { users } from "./identity";
 import { businesses, locations } from "./tenancy";
 
 export const serviceCategories = pgTable(
@@ -46,6 +47,7 @@ export const staffMembers = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
     locationId: uuid("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     title: text("title"),
     imageUrl: text("image_url"),
@@ -56,6 +58,7 @@ export const staffMembers = pgTable(
   (table) => [
     index("staff_members_business_idx").on(table.businessId),
     index("staff_members_location_idx").on(table.locationId),
+    uniqueIndex("staff_members_business_user_unique").on(table.businessId, table.userId),
   ],
 );
 
