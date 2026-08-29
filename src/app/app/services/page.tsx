@@ -11,10 +11,14 @@ export default async function ServicesPage() {
   const categories = await db.select().from(serviceCategories)
     .where(and(eq(serviceCategories.businessId, context.businessId), eq(serviceCategories.active, true))).orderBy(asc(serviceCategories.sortOrder), asc(serviceCategories.name));
   const catalog = await db.select({
-    id: services.id, name: services.name, description: services.description, durationMinutes: services.durationMinutes,
+    id: services.id, categoryId: services.categoryId, name: services.name, description: services.description, durationMinutes: services.durationMinutes,
     price: services.price, onlineBookable: services.onlineBookable, categoryName: serviceCategories.name,
   }).from(services).innerJoin(serviceCategories, and(eq(services.categoryId, serviceCategories.id), eq(serviceCategories.businessId, context.businessId)))
     .where(and(eq(services.businessId, context.businessId), eq(services.active, true))).orderBy(asc(serviceCategories.name), asc(services.name));
+  const categorizedCatalog = categories.map((category) => ({
+    ...category,
+    services: catalog.filter((service) => service.categoryId === category.id),
+  }));
 
   return <main className="dashboard-shell">
     <AppNav businessName={context.businessName} role={context.role} />
@@ -28,6 +32,6 @@ export default async function ServicesPage() {
         <label className="checkbox-row"><input name="onlineBookable" type="checkbox" defaultChecked/> Prenotabile online</label><button className="primary-button">Crea servizio</button>
       </form> : <p className="muted">Crea prima una categoria.</p>}</article>
     </section>
-    <section className="list-section"><h2>Listino</h2>{catalog.length ? <div className="data-list">{catalog.map(item => <article className="data-row" key={item.id}><div><p className="eyebrow">{item.categoryName}</p><h3>{item.name}</h3><p className="muted">{item.durationMinutes} min · € {Number(item.price).toFixed(2)} · {item.onlineBookable ? "Online" : "Solo interno"}</p>{item.description ? <p>{item.description}</p> : null}</div><form action={deleteService} className="delete-form"><input type="hidden" name="id" value={item.id}/><ConfirmSubmitButton message={`Eliminare il servizio ${item.name}? Sarà rimosso anche da tutti gli operatori.`}>Elimina servizio</ConfirmSubmitButton></form></article>)}</div> : <div className="empty-state">Nessun servizio ancora.</div>}</section>
+    <section className="list-section"><h2>Listino per categoria</h2>{categorizedCatalog.length ? <div className="data-list">{categorizedCatalog.map((category) => <section className="panel" key={category.id}><p className="eyebrow">Categoria</p><h2>{category.name}</h2>{category.services.length ? <div className="data-list">{category.services.map(item => <article className="data-row" key={item.id}><div><h3>{item.name}</h3><p className="muted">{item.durationMinutes} min · € {Number(item.price).toFixed(2)} · {item.onlineBookable ? "Online" : "Solo interno"}</p>{item.description ? <p>{item.description}</p> : null}</div><form action={deleteService} className="delete-form"><input type="hidden" name="id" value={item.id}/><ConfirmSubmitButton message={`Eliminare il servizio ${item.name}? Sarà rimosso anche da tutti gli operatori.`}>Elimina servizio</ConfirmSubmitButton></form></article>)}</div> : <div className="empty-state">Nessun servizio in questa categoria.</div>}</section>)}</div> : <div className="empty-state">Nessuna categoria ancora.</div>}</section>
   </main>;
 }
