@@ -20,6 +20,7 @@
     "drizzle-orm": "latest",
     "next": "latest",
     "pg": "latest",
+    "qrcode.react": "^4.2.0",
     "react": "latest",
     "react-dom": "latest",
     "zod": "latest"
