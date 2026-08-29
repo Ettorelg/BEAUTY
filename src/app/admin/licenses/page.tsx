@@ -4,40 +4,15 @@ import { db } from "@/db/client";
 import { businessMemberships, businesses, users } from "@/db/schema";
 import { LogoutButton } from "@/app/app/logout-button";
 import { requireSuperAdmin } from "@/lib/super-admin";
-import { grantLicense } from "./actions";
+import { deleteUser, grantLicense, resetUserPassword } from "./actions";
 
 export default async function AdminLicensesPage() {
   const administrator = await requireSuperAdmin();
-  const [businessRows, membershipRows, ownerRows] = await Promise.all([
+  const [businessRows, membershipRows, ownerRows, userRows] = await Promise.all([
     db.select().from(businesses).orderBy(asc(businesses.name)),
     db.select({ businessId: businessMemberships.businessId }).from(businessMemberships),
-    db.select({ businessId: businessMemberships.businessId, email: users.email })
-      .from(businessMemberships)
-      .innerJoin(users, eq(users.id, businessMemberships.userId))
-      .where(eq(businessMemberships.role, "OWNER")),
+    db.select({ businessId: businessMemberships.businessId, email: users.email }).from(businessMemberships).innerJoin(users, eq(users.id, businessMemberships.userId)).where(eq(businessMemberships.role, "OWNER")),
+    db.select({ id: users.id, email: users.email, name: users.name, createdAt: users.createdAt }).from(users).orderBy(asc(users.email)),
   ]);
-
-  return <main className="dashboard-shell">
-    <header className="app-header">
-      <div><p className="eyebrow">Super amministratore</p><strong>{administrator.email}</strong></div>
-      <LogoutButton />
-    </header>
-    <nav className="app-nav"><Link href="/admin/licenses">Tutte le licenze</Link></nav>
-    <section className="page-heading"><div><p className="eyebrow">Amministrazione globale</p><h1>Licenze</h1></div><p className="muted">Tutti i saloni registrati sulla piattaforma.</p></section>
-    <section className="management-grid"><article className="panel"><h2>Abilita nuovo titolare</h2><p className="muted">L’utente deve essersi già registrato come cliente.</p><form action={grantLicense} className="compact-form stacked"><input name="email" type="email" placeholder="Email titolare" required/><input name="businessName" placeholder="Nome salone" required/><input name="locationName" placeholder="Sede principale" defaultValue="Sede principale" required/><select name="timezone" defaultValue="Europe/Rome"><option value="Europe/Rome">Europe/Rome</option><option value="Europe/Paris">Europe/Paris</option><option value="Europe/London">Europe/London</option></select><button className="primary-button">Abilita licenza</button></form></article><article className="panel"><p><strong>{businessRows.length}</strong> licenze totali</p><p className="muted">Gli account senza licenza restano clienti.</p></article></section>
-    <section className="list-section"><div className="data-list">
-      {businessRows.map((business) => {
-        const owners = ownerRows.filter((row) => row.businessId === business.id).map((row) => row.email);
-        const members = membershipRows.filter((row) => row.businessId === business.id).length;
-        return <article className="data-row" key={business.id}><div><p className="eyebrow">Licenza attiva</p><h3>{business.name}</h3><p><strong>Slug:</strong> {business.slug}</p><p><strong>Titolare:</strong> {owners.join(", ") || "Non assegnato"}</p><p className="muted">Utenti collegati: {members} · Creata il {business.createdAt.toLocaleDateString("it-IT")}</p></div><div><span className="status-pill">Attiva</span><p><Link className="ghost-button link-button" href={`/admin/licenses/${business.id}`}>Controlla</Link></p></div></article>;
-      })}
-      {!businessRows.length ? <div className="empty-state">Nessuna licenza registrata.</div> : null}
-    </div></section>
-  </main>;
+  return <main className="dashboard-shell"><header className="app-header"><div><p className="eyebrow">Super amministratore</p><strong>{administrator.email}</strong></div><LogoutButton /></header><nav className="app-nav"><Link href="/admin/licenses">Tutte le licenze</Link></nav><section className="page-heading"><div><p className="eyebrow">Amministrazione globale</p><h1>Licenze e account</h1></div></section><section className="management-grid"><article className="panel"><h2>Abilita nuovo titolare</h2><p className="muted">L’utente deve essersi già registrato come cliente.</p><form action={grantLicense} className="compact-form stacked"><input name="email" type="email" placeholder="Email titolare" required/><input name="businessName" placeholder="Nome salone" required/><input name="locationName" placeholder="Sede principale" defaultValue="Sede principale" required/><select name="timezone" defaultValue="Europe/Rome"><option>Europe/Rome</option><option>Europe/Paris</option><option>Europe/London</option></select><button className="primary-button">Abilita licenza</button></form></article><article className="panel"><p><strong>{businessRows.length}</strong> licenze · <strong>{userRows.length}</strong> account</p><p className="muted">Gli account senza licenza restano clienti.</p></article></section><section className="list-section"><h2>Account utenti</h2><div className="data-list">{userRows.map((user) => <article className="data-row" key={user.id}><div><h3>{user.name || "Senza nome"}</h3><p>{user.email}</p></div><div className="compact-form"><form action={resetUserPassword} className="form-row"><input type="hidden" name="userId" value={user.id}/><input name="password" type="password" minLength={8} placeholder="Nuova password" required/><button className="ghost-button">Reimposta</button></form>{user.email.toLowerCase() !== administrator.email.toLowerCase() ? <form action={deleteUser}><input type="hidden" name="userId" value={user.id}/><button className="danger-button">Elimina account</button></form> : <span className="status-pill">Amministratore protetto</span>}</div></article>)}</div></section><section className="list-section"><div className="data-list">{businessRows.map((business) => { const owners = ownerRows.filter((row) => row.businessId === business.id).map((row) => row.email); const members = membershipRows.filter((row) => row.businessId === business.id).length; return <article className="data-row" key={business.id}><div><p className="eyebrow">Licenza attiva</p><h3>{business.name}</h3><p><strong>Titolare:</strong> {owners.join(", ") || "Non assegnato"}</p><p className="muted">Utenti collegati: {members}</p></div><Link className="ghost-button link-button" href={`/admin/licenses/${business.id}`}>Controlla</Link></article>; })}</div></section></main>;
 }
-
-
-
-
-
-

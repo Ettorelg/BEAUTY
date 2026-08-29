@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { businessMemberships, businesses, locations, users } from "@/db/schema";
+import { accounts, businessMemberships, businesses, locations, users } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { requireSuperAdmin } from "@/lib/super-admin";
 import { normalizeBusinessSlug } from "@/modules/businesses/domain/business-slug";
@@ -14,18 +14,31 @@ export async function grantLicense(formData: FormData) {
   await requireSuperAdmin();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
-  const input = z.object({ email: z.string().email(), businessName: z.string().trim().min(2).max(100), locationName: z.string().trim().min(2).max(100), timezone: z.string().trim().min(3).max(64) }).parse({
-    email: formData.get("email"), businessName: formData.get("businessName"), locationName: formData.get("locationName"), timezone: formData.get("timezone"),
-  });
+  const input = z.object({ email: z.string().email(), businessName: z.string().trim().min(2).max(100), locationName: z.string().trim().min(2).max(100), timezone: z.string().trim().min(3).max(64) }).parse({ email: formData.get("email"), businessName: formData.get("businessName"), locationName: formData.get("locationName"), timezone: formData.get("timezone") });
   const [owner] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email.toLowerCase())).limit(1);
   if (!owner) throw new Error("L’utente deve registrarsi prima come cliente.");
   const existing = await db.select({ id: businessMemberships.id }).from(businessMemberships).where(and(eq(businessMemberships.userId, owner.id), eq(businessMemberships.role, "OWNER"))).limit(1);
   if (existing.length) throw new Error("Questo utente ha già una licenza.");
   const slug = (normalizeBusinessSlug(input.businessName) || "salone") + "-" + crypto.randomUUID().slice(0, 6);
-  await db.transaction(async (tx) => {
-    const [business] = await tx.insert(businesses).values({ name: input.businessName, slug, timezone: input.timezone }).returning({ id: businesses.id });
-    await tx.insert(locations).values({ businessId: business.id, name: input.locationName, timezone: input.timezone });
-    await tx.insert(businessMemberships).values({ businessId: business.id, userId: owner.id, role: "OWNER" });
-  });
+  await db.transaction(async (tx) => { const [business] = await tx.insert(businesses).values({ name: input.businessName, slug, timezone: input.timezone }).returning({ id: businesses.id }); await tx.insert(locations).values({ businessId: business.id, name: input.locationName, timezone: input.timezone }); await tx.insert(businessMemberships).values({ businessId: business.id, userId: owner.id, role: "OWNER" }); });
+  redirect("/admin/licenses");
+}
+
+export async function resetUserPassword(formData: FormData) {
+  await requireSuperAdmin();
+  const userId = z.string().uuid().parse(formData.get("userId"));
+  const password = z.string().min(8).max(128).parse(formData.get("password"));
+  const context = await auth.$context;
+  const hashedPassword = await context.password.hash(password);
+  await db.update(accounts).set({ password: hashedPassword, updatedAt: new Date() }).where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")));
+  redirect("/admin/licenses");
+}
+
+export async function deleteUser(formData: FormData) {
+  const administrator = await requireSuperAdmin();
+  const userId = z.string().uuid().parse(formData.get("userId"));
+  const target = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!target[0] || target[0].email.toLowerCase() === administrator.email.toLowerCase()) throw new Error("Non puoi eliminare l’account amministratore.");
+  await db.delete(users).where(eq(users.id, userId));
   redirect("/admin/licenses");
 }
