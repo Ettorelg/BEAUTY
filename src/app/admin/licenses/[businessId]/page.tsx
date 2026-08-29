@@ -15,12 +15,12 @@ export default async function LicenseDetailPage({ params }: { params: Promise<{ 
   const [members, operators, serviceRows] = await Promise.all([
     db.select({ id: businessMemberships.id, role: businessMemberships.role, email: users.email, name: users.name, createdAt: businessMemberships.createdAt })
       .from(businessMemberships).innerJoin(users, eq(users.id, businessMemberships.userId))
-      .where(eq(businessMemberships.businessId, businessId)).orderBy(asc(users.email)),
+      .where(eq(businessMemberships.businessId, businessId)).orderBy(asc(users.email)).catch(() => []),
     db.select({ id: staffMembers.id, name: staffMembers.name, title: staffMembers.title, active: staffMembers.active, email: users.email })
       .from(staffMembers).leftJoin(users, eq(users.id, staffMembers.userId))
-      .where(eq(staffMembers.businessId, businessId)).orderBy(asc(staffMembers.name)),
+      .where(eq(staffMembers.businessId, businessId)).orderBy(asc(staffMembers.name)).catch(() => []),
     db.select({ id: services.id, name: services.name, active: services.active, onlineBookable: services.onlineBookable })
-      .from(services).where(eq(services.businessId, businessId)).orderBy(asc(services.name)),
+      .from(services).where(eq(services.businessId, businessId)).orderBy(asc(services.name)).catch(() => []),
   ]);
 
   return <main className="dashboard-shell">
@@ -36,3 +36,5 @@ export default async function LicenseDetailPage({ params }: { params: Promise<{ 
     <section className="list-section"><h2>Servizi</h2><div className="data-list">{serviceRows.map((service) => <article className="data-row" key={service.id}><div><h3>{service.name}</h3><p className="muted">{service.onlineBookable ? "Prenotabile online" : "Solo gestionale"}</p></div><span className="status-pill">{service.active ? "Attivo" : "Disattivo"}</span></article>)}{!serviceRows.length ? <div className="empty-state">Nessun servizio.</div> : null}</div></section>
   </main>;
 }
+
+
