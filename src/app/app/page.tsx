@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
+import { isSuperAdminEmail } from "@/lib/super-admin";
 import { AppNav } from "./app-nav";
 
 export default async function AppPage() {
@@ -19,8 +20,11 @@ export default async function AppPage() {
       <section className="module-grid">
         <Link className="module-card module-link" href="/app/services"><h2>Servizi</h2><p>Gestisci listino e categorie</p></Link>
         <Link className="module-card module-link" href="/app/staff"><h2>Staff</h2><p>Operatori, turni e assenze</p></Link>
+        {isSuperAdminEmail(context.user.email) ? <Link className="module-card module-link" href="/admin/licenses"><h2>Licenze</h2><p>Amministrazione globale dei saloni</p></Link> : null}
         {["Agenda", "Clienti", "Fidelity", "Impostazioni"].map((name) => <article className="module-card" key={name}><h2>{name}</h2><p>In preparazione</p></article>)}
       </section>
     </main>
   );
 }
+
+
