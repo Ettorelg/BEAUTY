@@ -8,9 +8,9 @@ export default function CustomerLoginPage() {
       <section className="auth-card">
         <p className="eyebrow">Area clienti</p>
         <h1>Le tue prenotazioni.</h1>
-        <p className="muted">Accedi con email, Google o Apple per ritrovare i tuoi appuntamenti.</p>
+        <p className="muted">Accedi con email o Google per ritrovare i tuoi appuntamenti.</p>
         <SocialAuthButtons
-          appleEnabled={Boolean(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET)}
+          appleEnabled={false}
           callbackURL="/account"
           googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)}
         />
@@ -20,3 +20,5 @@ export default function CustomerLoginPage() {
     </main>
   );
 }
+
+

@@ -10,7 +10,7 @@ export default function CustomerRegisterPage() {
         <h1>Crea il tuo account.</h1>
         <p className="muted">Registrati per consultare le tue prenotazioni in ogni momento.</p>
         <SocialAuthButtons
-          appleEnabled={Boolean(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET)}
+          appleEnabled={false}
           callbackURL="/account"
           googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)}
         />
@@ -20,3 +20,5 @@ export default function CustomerRegisterPage() {
     </main>
   );
 }
+
+
