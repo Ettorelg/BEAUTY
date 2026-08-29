@@ -1,20 +1,2 @@
-import { LoginForm } from "./login-form";
-import { SocialAuthButtons } from "../social-auth-buttons";
-
-export default function LoginPage() {
-  return (
-    <main className="auth-shell">
-      <section className="auth-card">
-        <p className="eyebrow">Beauty SaaS</p>
-        <h1>Bentornato.</h1>
-        <p className="muted">Accedi per gestire salone, agenda e clienti.</p>
-        <SocialAuthButtons
-          appleEnabled={Boolean(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET)}
-          callbackURL="/app"
-          googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)}
-        />
-        <LoginForm />
-      </section>
-    </main>
-  );
-}
+import Link from "next/link"; import { LoginForm } from "./login-form"; import { SocialAuthButtons } from "../social-auth-buttons";
+export default function LoginPage(){return <main className="auth-shell"><section className="auth-card"><p className="eyebrow">Alpha Beauty · Professionisti</p><h1>Gestisci il tuo salone.</h1><p className="muted">Accesso riservato a titolari, staff e amministrazione della piattaforma.</p><SocialAuthButtons appleEnabled={Boolean(process.env.APPLE_CLIENT_ID&&process.env.APPLE_CLIENT_SECRET)} callbackURL="/app" googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID&&process.env.GOOGLE_CLIENT_SECRET)}/><LoginForm/><p className="auth-secondary-link">Cerchi un salone o le tue prenotazioni? <Link href="/account/login">Vai all’area clienti</Link></p></section></main>}
