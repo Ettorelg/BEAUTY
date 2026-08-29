@@ -1,9 +1,14 @@
+import { headers } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireBusinessContext } from "@/lib/business-context";
 import { isSuperAdminEmail } from "@/lib/super-admin";
+import { auth } from "@/lib/auth";
 import { AppNav } from "./app-nav";
 
 export default async function AppPage() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session && isSuperAdminEmail(session.user.email)) redirect("/admin/licenses");
   const context = await requireBusinessContext();
 
   return (
@@ -26,5 +31,7 @@ export default async function AppPage() {
     </main>
   );
 }
+
+
 
 
