@@ -26,7 +26,7 @@ export default async function StaffPage() {
     .where(eq(staffServices.businessId, context.businessId));
   const shifts = await db.select().from(workingHours).where(eq(workingHours.businessId, context.businessId)).orderBy(asc(workingHours.weekday), asc(workingHours.startMinutes));
   const absences = await db.select().from(staffAbsences).where(eq(staffAbsences.businessId, context.businessId)).orderBy(asc(staffAbsences.startsAt));
-  const invitations = await db.select().from(staffInvitations).where(eq(staffInvitations.businessId, context.businessId));
+  const invitations = await db.select().from(staffInvitations).where(eq(staffInvitations.businessId, context.businessId)).catch(() => []);
 
   return <main className="dashboard-shell"><AppNav businessName={context.businessName} role={context.role}/>
     <div className="page-heading"><div><p className="eyebrow">Organizzazione</p><h1>Staff</h1></div><p className="muted">Operatori, competenze, turni e assenze.</p></div>
@@ -57,3 +57,5 @@ export default async function StaffPage() {
     })}</div> : <div className="empty-state">Nessun operatore ancora.</div>}</section>
   </main>;
 }
+
+
