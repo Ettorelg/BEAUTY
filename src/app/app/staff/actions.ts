@@ -95,16 +95,37 @@ export async function assignCategory(formData: FormData) {
   refreshStaffPages();
 }
 
+function parseWorkingHours(formData: FormData) {
+  const input = z.object({ weekday: z.coerce.number().int().min(0).max(6), start: z.string(), end: z.string() })
+    .parse({ weekday: formData.get("weekday"), start: formData.get("start"), end: formData.get("end") });
+  const startMinutes = parseTimeToMinutes(input.start);
+  const endMinutes = parseTimeToMinutes(input.end);
+  if (endMinutes <= startMinutes) throw new Error("La fine del turno deve essere successiva all’inizio.");
+  return { weekday: weekdayValues[input.weekday], startMinutes, endMinutes };
+}
+
 export async function addWorkingHours(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
-  const input = z.object({ staffId: z.string().uuid(), weekday: z.coerce.number().int().min(0).max(6), start: z.string(), end: z.string() })
-    .parse({ staffId: formData.get("staffId"), weekday: formData.get("weekday"), start: formData.get("start"), end: formData.get("end") });
-  const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.id, input.staffId), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).limit(1);
+  const staffId = z.string().uuid().parse(formData.get("staffId"));
+  const input = parseWorkingHours(formData);
+  const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.id, staffId), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).limit(1);
   if (!staff) throw new Error("Operatore non valido.");
-  input.weekday = weekdayValues[input.weekday];
-  const startMinutes = parseTimeToMinutes(input.start); const endMinutes = parseTimeToMinutes(input.end);
-  if (endMinutes <= startMinutes) throw new Error("La fine del turno deve essere successiva all’inizio.");
-  await db.insert(workingHours).values({ businessId: context.businessId, staffId: input.staffId, weekday: input.weekday, startMinutes, endMinutes });
+  await db.insert(workingHours).values({ businessId: context.businessId, staffId, ...input });
+  refreshStaffPages();
+}
+
+export async function updateWorkingHours(formData: FormData) {
+  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const id = z.string().uuid().parse(formData.get("id"));
+  const input = parseWorkingHours(formData);
+  await db.update(workingHours).set(input).where(and(eq(workingHours.id, id), eq(workingHours.businessId, context.businessId)));
+  refreshStaffPages();
+}
+
+export async function deleteWorkingHours(formData: FormData) {
+  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const id = z.string().uuid().parse(formData.get("id"));
+  await db.delete(workingHours).where(and(eq(workingHours.id, id), eq(workingHours.businessId, context.businessId)));
   refreshStaffPages();
 }
 

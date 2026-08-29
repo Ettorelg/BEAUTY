@@ -5,7 +5,7 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { formatMinutes } from "@/modules/availability/domain/time-slots";
 import { AppNav } from "../app-nav";
 import { ConfirmSubmitButton } from "../confirm-submit-button";
-import { addAbsence, addWorkingHours, assignCategory, assignService, createStaffMember, deleteStaffMember, removeAssignedService, updateStaffMember } from "./actions";
+import { addAbsence, addWorkingHours, assignCategory, assignService, createStaffMember, deleteStaffMember, deleteWorkingHours, removeAssignedService, updateStaffMember, updateWorkingHours } from "./actions";
 
 const weekdays = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
 const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
@@ -36,7 +36,11 @@ export default async function StaffPage() {
       const memberAbsences = absences.filter(absence => absence.staffId === member.id);
       return <article className="data-row staff-row" key={member.id}><div className="staff-card-main"><h3>{member.name}</h3><p className="muted">{member.title || "Operatore"}</p>
         <div className="staff-services"><strong>Servizi associati</strong>{memberAssignments.length ? <div className="assignment-list">{memberAssignments.map(assignment => <form action={removeAssignedService} className="assignment-chip" key={assignment.serviceId}><input type="hidden" name="staffId" value={member.id}/><input type="hidden" name="serviceId" value={assignment.serviceId}/><span>{assignment.serviceName}</span><ConfirmSubmitButton className="assignment-remove" message={`Rimuovere ${assignment.serviceName} da ${member.name}?`}>Rimuovi</ConfirmSubmitButton></form>)}</div> : <p className="muted">Nessun servizio associato.</p>}</div>
-        <p><strong>Turni:</strong> {memberShifts.map(shift => `${weekdays[weekdayValues.indexOf(shift.weekday)]} ${formatMinutes(shift.startMinutes)}–${formatMinutes(shift.endMinutes)}`).join(" · ") || "non configurati"}</p>
+        <div className="staff-services"><strong>Turni</strong>{memberShifts.length ? memberShifts.map(shift => {
+          const weekdayIndex = weekdayValues.indexOf(shift.weekday);
+          const shiftLabel = `${weekdays[weekdayIndex]} ${formatMinutes(shift.startMinutes)}–${formatMinutes(shift.endMinutes)}`;
+          return <details className="edit-disclosure" key={shift.id}><summary>{shiftLabel}</summary><form action={updateWorkingHours} className="compact-form stacked"><input type="hidden" name="id" value={shift.id}/><select name="weekday" defaultValue={weekdayIndex}>{weekdays.map((day, index) => <option value={index} key={day}>{day}</option>)}</select><div className="form-row"><label>Inizio<input name="start" type="time" defaultValue={formatMinutes(shift.startMinutes)} required/></label><label>Fine<input name="end" type="time" defaultValue={formatMinutes(shift.endMinutes)} required/></label></div><button className="ghost-button">Salva turno</button></form><form action={deleteWorkingHours} className="button-row"><input type="hidden" name="id" value={shift.id}/><ConfirmSubmitButton message={`Eliminare il turno ${shiftLabel} di ${member.name}?`}>Elimina turno</ConfirmSubmitButton></form></details>;
+        }) : <p className="muted">Nessun turno configurato.</p>}</div>
         {memberAbsences.length ? <p><strong>Assenze:</strong> {memberAbsences.map(absence => `${absence.startsAt.toLocaleDateString("it-IT")}–${absence.endsAt.toLocaleDateString("it-IT")}`).join(", ")}</p> : null}
         <details className="edit-disclosure"><summary>Modifica operatore</summary><form action={updateStaffMember} className="compact-form stacked"><input type="hidden" name="id" value={member.id}/><input name="name" defaultValue={member.name} required minLength={2}/><input name="title" defaultValue={member.title ?? ""} placeholder="Ruolo"/><button className="ghost-button">Salva modifiche</button></form></details>
       </div><form action={deleteStaffMember} className="delete-form"><input type="hidden" name="id" value={member.id}/><ConfirmSubmitButton message={`Eliminare ${member.name}? Verranno rimossi anche servizi associati, turni e assenze.`}>Elimina operatore</ConfirmSubmitButton></form></article>;
