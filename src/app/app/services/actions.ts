@@ -77,18 +77,12 @@ export async function updateService(formData: FormData) {
 export async function deleteService(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const id = z.string().uuid().parse(formData.get("id"));
-  await db.transaction(async (tx) => {
-    const [linkedAppointment] = await tx.select({ id: appointments.id }).from(appointments)
-      .where(and(eq(appointments.serviceId, id), eq(appointments.businessId, context.businessId))).limit(1);
-    await tx.delete(staffServices).where(and(eq(staffServices.serviceId, id), eq(staffServices.businessId, context.businessId)));
-    if (linkedAppointment) {
-      await tx.update(services).set({ active: false, onlineBookable: false, updatedAt: new Date() })
-        .where(and(eq(services.id, id), eq(services.businessId, context.businessId)));
-    } else {
-      await tx.delete(services).where(and(eq(services.id, id), eq(services.businessId, context.businessId)));
-    }
-  });
+  await db.delete(staffServices).where(and(eq(staffServices.serviceId, id), eq(staffServices.businessId, context.businessId)));
+  await db.update(services).set({ active: false, onlineBookable: false, updatedAt: new Date() })
+    .where(and(eq(services.id, id), eq(services.businessId, context.businessId)));
   refreshServicePages();
 }
+
+
 
 

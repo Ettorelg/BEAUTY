@@ -13,8 +13,19 @@ const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
 
 export default async function StaffPage() {
   const context = await requireBusinessContext();
-  const staff = await db.select().from(staffMembers)
+  const staffRows = await db.select({
+    id: staffMembers.id,
+    businessId: staffMembers.businessId,
+    locationId: staffMembers.locationId,
+    name: staffMembers.name,
+    title: staffMembers.title,
+    imageUrl: staffMembers.imageUrl,
+    active: staffMembers.active,
+    createdAt: staffMembers.createdAt,
+    updatedAt: staffMembers.updatedAt,
+  }).from(staffMembers)
     .where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).orderBy(asc(staffMembers.name));
+  const staff = staffRows.map((member) => ({ ...member, userId: null as string | null }));
   const ownerIsOperator = staff.some((member) => member.userId === context.user.id);
   const emailConfigured = isStaffEmailConfigured();
   const catalog = await db.select({ id: services.id, name: services.name }).from(services)
@@ -53,9 +64,13 @@ export default async function StaffPage() {
         }) : <p className="muted">Nessun turno configurato.</p>}</div>
         {memberAbsences.length ? <p><strong>Assenze:</strong> {memberAbsences.map(absence => `${absence.startsAt.toLocaleDateString("it-IT")}–${absence.endsAt.toLocaleDateString("it-IT")}`).join(", ")}</p> : null}
         <details className="edit-disclosure"><summary>Modifica operatore</summary><form action={updateStaffMember} className="compact-form stacked"><input type="hidden" name="id" value={member.id}/><input name="name" defaultValue={member.name} required minLength={2}/><input name="title" defaultValue={member.title ?? ""} placeholder="Ruolo"/><button className="ghost-button">Salva modifiche</button></form></details>
-      </div><form action={deleteStaffMember} className="delete-form"><input type="hidden" name="id" value={member.id}/><ConfirmSubmitButton message={isOwnerOperator ? "Rimuovere il titolare dall’agenda? L’account amministrativo e l’accesso al salone resteranno attivi." : `Eliminare ${member.name}? Verranno rimossi anche accesso al gestionale, servizi associati, turni e assenze.`}>{isOwnerOperator ? "Rimuovi dall’agenda" : "Elimina operatore"}</ConfirmSubmitButton></form></article>;
+      </div><form action={deleteStaffMember} className="delete-form"><input type="hidden" name="id" value={member.id}/><details><summary className="danger-button">{isOwnerOperator ? "Rimuovi dall’agenda" : "Elimina operatore"}</summary><p className="muted">{isOwnerOperator ? "Il titolare resterà attivo come account." : "Confermi la rimozione di "}{!isOwnerOperator ? member.name : ""}?</p><button className="danger-button" type="submit">Conferma eliminazione</button></details></form></article>;
     })}</div> : <div className="empty-state">Nessun operatore ancora.</div>}</section>
   </main>;
 }
+
+
+
+
 
 
