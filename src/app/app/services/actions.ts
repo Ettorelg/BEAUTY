@@ -59,6 +59,21 @@ export async function createService(formData: FormData) {
   refreshServicePages();
 }
 
+export async function updateService(formData: FormData) {
+  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const input = serviceSchema.extend({ id: z.string().uuid() }).parse({
+    id: formData.get("id"), categoryId: formData.get("categoryId"), name: formData.get("name"),
+    description: formData.get("description") || undefined, durationMinutes: formData.get("durationMinutes"),
+    price: formData.get("price"), onlineBookable: formData.get("onlineBookable") === "on",
+  });
+  const [category] = await db.select({ id: serviceCategories.id }).from(serviceCategories)
+    .where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.businessId, context.businessId), eq(serviceCategories.active, true))).limit(1);
+  if (!category) throw new Error("Categoria non valida.");
+  await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, price: input.price.toFixed(2), onlineBookable: input.onlineBookable, updatedAt: new Date() })
+    .where(and(eq(services.id, input.id), eq(services.businessId, context.businessId)));
+  refreshServicePages();
+}
+
 export async function deleteService(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const id = z.string().uuid().parse(formData.get("id"));
@@ -75,3 +90,5 @@ export async function deleteService(formData: FormData) {
   });
   refreshServicePages();
 }
+
+
