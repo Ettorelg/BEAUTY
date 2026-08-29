@@ -23,11 +23,12 @@ export default async function StaffInvitePage({ params }: { params: Promise<{ to
     .innerJoin(staffMembers, and(eq(staffMembers.id, staffInvitations.staffId), eq(staffMembers.businessId, staffInvitations.businessId)))
     .innerJoin(businesses, eq(businesses.id, staffInvitations.businessId))
     .where(eq(staffInvitations.tokenHash, hashStaffInvitationToken(token))).limit(1);
-  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!invitation) return <InviteMessage title="Invito non valido" message="Il collegamento non esiste o è stato sostituito da un invito più recente." />;
   if (invitation.acceptedAt) return <InviteMessage title="Invito già utilizzato" message="L’account è già stato collegato al salone." link="/app" />;
   if (invitation.expiresAt <= new Date()) return <InviteMessage title="Invito scaduto" message="Chiedi al titolare del salone di reinviare l’invito." />;
+
+  const session = await auth.api.getSession({ headers: await headers() });
   const callbackURL = `/staff-invite/${token}`;
 
   return <main className="auth-shell"><section className="auth-card wide-card"><p className="eyebrow">Invito staff</p><h1>Entra in {invitation.businessName}.</h1><p className="muted">Ciao {invitation.staffName}, completa l’accesso con l’indirizzo {invitation.email}.</p>
