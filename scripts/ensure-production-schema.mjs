@@ -8,6 +8,16 @@ await client.connect();
 
 try {
   await client.query(`
+    ALTER TABLE "staff_members" ADD COLUMN IF NOT EXISTS "user_id" uuid;
+    DO $
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'staff_members_user_id_users_id_fk') THEN
+        ALTER TABLE "staff_members" ADD CONSTRAINT "staff_members_user_id_users_id_fk"
+          FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL;
+      END IF;
+    END $;
+    CREATE UNIQUE INDEX IF NOT EXISTS "staff_members_business_user_unique" ON "staff_members" ("business_id", "user_id");
+
     CREATE TABLE IF NOT EXISTS "staff_invitations" (
       "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
       "business_id" uuid NOT NULL REFERENCES "businesses"("id") ON DELETE CASCADE,
@@ -31,3 +41,5 @@ try {
 } finally {
   await client.end();
 }
+
+
