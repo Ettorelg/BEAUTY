@@ -35,6 +35,12 @@ export const auth = betterAuth({
       verification: verifications,
     },
   }),
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+    },
+  },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
@@ -46,3 +52,5 @@ export const auth = betterAuth({
     },
   },
 });
+
+
