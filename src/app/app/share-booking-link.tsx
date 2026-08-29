@@ -1,0 +1,2 @@
+"use client";
+export function ShareBookingLink({url}:{url:string}){async function share(){if(navigator.share)await navigator.share({title:"Prenota online",url});else{await navigator.clipboard.writeText(url);alert("Link copiato");}}return <article className="panel"><h2>Link prenotazioni</h2><p className="muted">Condividilo con i clienti per ricevere prenotazioni online.</p><div className="form-row"><input readOnly value={url}/><button type="button" className="primary-button" onClick={share}>Condividi</button></div></article>}
