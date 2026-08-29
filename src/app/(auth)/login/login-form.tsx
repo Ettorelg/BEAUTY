@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
-export function LoginForm() {
+export function LoginForm({ redirectTo = "/app" }: { redirectTo?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -33,7 +33,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/app");
+    router.push(redirectTo);
     router.refresh();
   }
 
@@ -45,7 +45,7 @@ export function LoginForm() {
       <button className="primary-button" disabled={pending} type="submit">
         {pending ? "Accesso…" : "Accedi"}
       </button>
-      <p className="form-footer">Non hai un account? <Link href="/register">Registrati</Link></p>
+      <p className="form-footer">Non hai un account? <Link href={redirectTo === "/account" ? "/account/register" : "/register"}>Registrati</Link></p>
     </form>
   );
 }

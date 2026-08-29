@@ -59,6 +59,18 @@ button { cursor: pointer; }
 .auth-form input:focus, .auth-form select:focus { outline: 3px solid rgb(111 81 69 / 15%); border-color: var(--accent); }
 .form-error { margin: 0; color: #a12d2d; }
 .form-footer { margin: 0; text-align: center; color: #756a65; }
+.social-auth { display: grid; gap: 14px; margin-top: 26px; }
+.social-buttons { display: grid; gap: 10px; }
+.social-button { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #d8cec8; border-radius: 11px; background: white; color: var(--foreground); font-weight: 700; }
+.social-button:hover { border-color: #a9968c; background: #fcfaf9; }
+.social-button:disabled { cursor: wait; opacity: .65; }
+.social-mark { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; font-weight: 800; }
+.social-button-google .social-mark { color: #4285f4; }
+.social-button-apple .social-mark { color: #111; font-size: .78rem; }
+.auth-divider { display: flex; align-items: center; gap: 12px; color: #9a8f89; font-size: .8rem; }
+.auth-divider::before, .auth-divider::after { height: 1px; flex: 1; background: #e8e1dd; content: ""; }
+.social-auth + .auth-form { margin-top: 0; }
+.auth-secondary-link { margin: 20px 0 0; text-align: center; color: #756a65; font-size: .88rem; }
 
 .dashboard-shell { width: min(1120px, calc(100% - 32px)); padding-top: 28px; }
 .app-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 42px; }
@@ -108,6 +120,8 @@ button { cursor: pointer; }
 .public-header h1 { margin: 0; font-size: 1.55rem; }
 .public-header p { margin: 0 0 4px; font-size: .68rem; }
 .public-header span { color: #756a65; font-size: .84rem; }
+.public-account-actions { display: flex; align-items: center; gap: 14px; }
+.public-account-actions .ghost-button { min-height: 40px; padding: 8px 13px; }
 .public-hero { min-height: 360px; display: flex; align-items: end; padding: 48px; border-radius: 30px; background: linear-gradient(120deg, #2b211d 0%, #604b41 58%, #b29483 100%); color: white; }
 .public-hero h2 { max-width: 760px; margin: 8px 0 14px; font-family: Georgia, serif; font-size: clamp(2.6rem, 7vw, 5.8rem); font-weight: 400; line-height: .98; }
 .public-hero .eyebrow { color: #e9d8cf; }
@@ -131,6 +145,10 @@ button { cursor: pointer; }
 .empty-prompt span { font-family: Georgia, serif; font-size: 2.4rem; color: #c3aea3; }
 .confirmation-card { text-align: center; }
 .confirmation-mark { width: 64px; height: 64px; display: grid; place-items: center; margin: 0 auto 20px; border-radius: 50%; background: #dcebdd; color: #25572e; font-size: 2rem; }
+.customer-account-shell { width: min(900px, calc(100% - 32px)); padding-top: 42px; }
+.customer-account-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; }
+.customer-account-header h1 { margin-bottom: 8px; }
+.customer-account-header p { margin-top: 0; }
 
 @media (max-width: 700px) {
   main { padding: 36px 0; }
@@ -141,6 +159,8 @@ button { cursor: pointer; }
   .management-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
   .compact-form:not(.stacked) { display: grid; }
+  .public-header, .customer-account-header { align-items: flex-start; display: grid; gap: 18px; }
+  .public-account-actions { align-items: flex-start; flex-direction: column; }
   .public-hero { min-height: 320px; padding: 28px; }
   .booking-layout { grid-template-columns: 1fr; margin-top: 36px; }
   .booking-panel { position: static; }

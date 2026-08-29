@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
-export function RegisterForm() {
+export function RegisterForm({ redirectTo = "/onboarding" }: { redirectTo?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -22,11 +22,18 @@ export function RegisterForm() {
       return;
     }
 
-    const result = await authClient.signUp.email({
-      name: String(data.get("name")),
-      email: String(data.get("email")),
-      password,
-    });
+    let result;
+    try {
+      result = await authClient.signUp.email({
+        name: String(data.get("name")),
+        email: String(data.get("email")),
+        password,
+      });
+    } catch {
+      setError("Servizio temporaneamente non disponibile. Riprova tra poco.");
+      setPending(false);
+      return;
+    }
 
     if (result.error) {
       setError(result.error.message ?? "Impossibile creare l’account.");
@@ -34,7 +41,7 @@ export function RegisterForm() {
       return;
     }
 
-    router.push("/onboarding");
+    router.push(redirectTo);
     router.refresh();
   }
 
@@ -48,7 +55,7 @@ export function RegisterForm() {
       <button className="primary-button" disabled={pending} type="submit">
         {pending ? "Creazione…" : "Crea account"}
       </button>
-      <p className="form-footer">Hai già un account? <Link href="/login">Accedi</Link></p>
+      <p className="form-footer">Hai già un account? <Link href={redirectTo === "/account" ? "/account/login" : "/login"}>Accedi</Link></p>
     </form>
   );
 }

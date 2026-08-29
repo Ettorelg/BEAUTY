@@ -1,10 +1,12 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { appointmentEvents, appointments, businesses, customerRelations, locations, services, staffMembers, staffServices } from "@/db/schema";
+import { auth } from "@/lib/auth";
 import { getPublicAvailability } from "@/modules/availability/application/public-availability";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 
@@ -17,6 +19,7 @@ const schema = z.object({ slug: z.string().min(1), serviceId: z.string().uuid(),
 
 export async function createPublicAppointment(formData: FormData) {
   const input = schema.parse(Object.fromEntries(formData));
+  const session = await auth.api.getSession({ headers: await headers() });
   const { staffId, startsAt: localStart } = input.selection;
   const [selection] = await db.select({ businessId: businesses.id, timezone: businesses.timezone, locationId: locations.id,
     serviceName: services.name, duration: services.durationMinutes, price: services.price })
@@ -33,8 +36,12 @@ export async function createPublicAppointment(formData: FormData) {
 
   await db.transaction(async (tx) => {
     const email = input.email.toLowerCase();
-    const [known] = await tx.select({ id: customerRelations.id }).from(customerRelations).where(and(eq(customerRelations.businessId, selection.businessId), eq(customerRelations.email, email))).limit(1);
-    const customerId = known?.id ?? (await tx.insert(customerRelations).values({ businessId: selection.businessId, name: input.customerName, email, phone: input.phone || null }).returning({ id: customerRelations.id }))[0].id;
+    const signedInUserId = session?.user.email.toLowerCase() === email ? session.user.id : null;
+    const [known] = await tx.select({ id: customerRelations.id, userId: customerRelations.userId }).from(customerRelations).where(and(eq(customerRelations.businessId, selection.businessId), eq(customerRelations.email, email))).limit(1);
+    if (known && signedInUserId && !known.userId) {
+      await tx.update(customerRelations).set({ userId: signedInUserId, updatedAt: new Date() }).where(eq(customerRelations.id, known.id));
+    }
+    const customerId = known?.id ?? (await tx.insert(customerRelations).values({ businessId: selection.businessId, userId: signedInUserId, name: input.customerName, email, phone: input.phone || null }).returning({ id: customerRelations.id }))[0].id;
     const [created] = await tx.insert(appointments).values({ businessId: selection.businessId, locationId: selection.locationId, customerRelationId: customerId,
       staffId, serviceId: input.serviceId, serviceName: selection.serviceName, durationMinutes: selection.duration, price: selection.price,
       startsAt, endsAt: new Date(startsAt.getTime() + selection.duration * 60_000), timezone: selection.timezone, source: "PUBLIC", idempotencyKey: input.idempotencyKey })
