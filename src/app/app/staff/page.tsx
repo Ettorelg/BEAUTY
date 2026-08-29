@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { serviceCategories, services, staffAbsences, staffInvitations, staffMembers, staffServices, workingHours } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
@@ -14,7 +14,20 @@ const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
 export default async function StaffPage() {
   const context = await requireBusinessContext();
   const staff = await db.select().from(staffMembers)
-    .where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).orderBy(asc(staffMembers.name));
+    .where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).orderBy(asc(staffMembers.name))
+    .catch(() => db.select({
+      id: staffMembers.id,
+      businessId: staffMembers.businessId,
+      locationId: staffMembers.locationId,
+      userId: sql<string | null>\`null\`.as("user_id"),
+      name: staffMembers.name,
+      title: staffMembers.title,
+      imageUrl: staffMembers.imageUrl,
+      active: staffMembers.active,
+      createdAt: staffMembers.createdAt,
+      updatedAt: staffMembers.updatedAt,
+    }).from(staffMembers)
+      .where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).orderBy(asc(staffMembers.name)));
   const ownerIsOperator = staff.some((member) => member.userId === context.user.id);
   const emailConfigured = isStaffEmailConfigured();
   const catalog = await db.select({ id: services.id, name: services.name }).from(services)
@@ -57,5 +70,9 @@ export default async function StaffPage() {
     })}</div> : <div className="empty-state">Nessun operatore ancora.</div>}</section>
   </main>;
 }
+
+
+
+
 
 
