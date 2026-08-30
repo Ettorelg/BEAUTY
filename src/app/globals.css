@@ -230,3 +230,7 @@ button { cursor: pointer; }
 .customer-top-nav { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:24px; }
 .customer-top-nav > span { color:#756a65; font-size:.85rem; font-weight:700; }
 @media(max-width:700px){.customer-top-nav .ghost-button{min-height:42px;padding:9px 11px}.customer-top-nav form{margin-left:auto}}
+
+.customer-profile-card { margin: 0 0 28px; }
+.customer-profile-card h2 { margin-top: 0; }
+.customer-profile-card p { margin: 7px 0; }
