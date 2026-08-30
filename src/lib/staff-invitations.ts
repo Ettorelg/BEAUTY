@@ -61,17 +61,14 @@ export async function issueStaffInvitation({ businessId, businessName, staffId, 
   const tokenHash = hashStaffInvitationToken(token);
   const expiresAt = new Date(Date.now() + invitationLifetimeMs);
   await db.delete(staffInvitations).where(and(eq(staffInvitations.businessId, businessId), eq(staffInvitations.email, normalizedEmail), ne(staffInvitations.staffId, staffId)));
-  const [invitation] = await db.insert(staffInvitations).values({
-    businessId,
-    staffId,
-    email: normalizedEmail,
-    tokenHash,
-    expiresAt,
-    createdBy,
-  }).onConflictDoUpdate({
-    target: staffInvitations.staffId,
-    set: { email: normalizedEmail, tokenHash, expiresAt, sentAt: null, acceptedAt: null, lastError: null, createdBy, updatedAt: new Date() },
-  }).returning({ id: staffInvitations.id });
+  const [existing] = await db.select({ id: staffInvitations.id }).from(staffInvitations)
+    .where(and(eq(staffInvitations.businessId, businessId), eq(staffInvitations.email, normalizedEmail))).limit(1);
+  let invitation: { id: string } | undefined;
+  if (existing) {
+    [invitation] = await db.update(staffInvitations).set({ staffId, email: normalizedEmail, tokenHash, expiresAt, sentAt: null, acceptedAt: null, lastError: null, createdBy, updatedAt: new Date() }).where(eq(staffInvitations.id, existing.id)).returning({ id: staffInvitations.id });
+  } else {
+    [invitation] = await db.insert(staffInvitations).values({ businessId, staffId, email: normalizedEmail, tokenHash, expiresAt, createdBy }).returning({ id: staffInvitations.id });
+  }
 
   const baseUrl = (process.env.BETTER_AUTH_URL ?? process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
   const invitationUrl = `${baseUrl}/staff-invite/${token}`;
