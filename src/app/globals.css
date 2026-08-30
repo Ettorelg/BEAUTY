@@ -236,3 +236,5 @@ button { cursor: pointer; }
 .customer-profile-card p { margin: 7px 0; }
 
 .public-loyalty{display:flex;align-items:center;gap:16px;margin:18px 0;padding:14px 18px}.public-loyalty span{font-size:1.2rem;font-weight:800;color:var(--accent)}.public-loyalty small{color:#756a65}
+
+.customer-collapsible{margin-bottom:24px}.customer-collapsible>summary{cursor:pointer;padding:14px 18px;border:1px solid #e4ddd8;border-radius:12px;background:#fff;font-weight:800;color:#6f5145;list-style:none}.customer-collapsible>summary::-webkit-details-marker{display:none}.customer-collapsible[open]>summary{border-radius:12px 12px 0 0}.customer-collapsible .customer-profile-card,.customer-collapsible .list-section{margin-top:0}
