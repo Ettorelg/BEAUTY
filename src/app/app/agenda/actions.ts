@@ -120,25 +120,28 @@ function inArrayValue<T extends readonly string[]>(values: T, value: string): va
 
 export async function rescheduleAppointment(formData: FormData) {
   const context = await requireBusinessContext();
-  const input = z.object({ id: z.string().uuid(), startsAt: z.string().min(16) }).parse(Object.fromEntries(formData));
+  const input = z.object({ id: z.string().uuid(), startsAt: z.string().min(16), staffId: z.string().uuid().optional() }).parse(Object.fromEntries(formData));
   const ownStaffId = context.role === "STAFF" ? await staffIdForCurrentUser(context.businessId, context.user.id) : undefined;
   if (context.role === "STAFF" && !ownStaffId) throw new Error("Profilo operatore non collegato.");
   await db.transaction(async (tx) => {
-    const [current] = await tx.select({ staffId: appointments.staffId, durationMinutes: appointments.durationMinutes, status: appointments.status })
+    const [current] = await tx.select({ staffId: appointments.staffId, serviceId: appointments.serviceId, durationMinutes: appointments.durationMinutes, status: appointments.status })
       .from(appointments).where(and(eq(appointments.id, input.id), eq(appointments.businessId, context.businessId))).limit(1);
     if (!current || (ownStaffId && current.staffId !== ownStaffId)) throw new Error("Appuntamento non spostabile.");
     if (context.role === "STAFF" && inArrayValue(finalStatuses, current.status)) throw new Error("Lo staff non può spostare un appuntamento concluso.");
+    const targetStaffId = context.role === "OWNER" ? input.staffId ?? current.staffId : current.staffId;
+    const [assignment] = await tx.select({ id: staffServices.staffId }).from(staffServices).innerJoin(staffMembers, and(eq(staffServices.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).where(and(eq(staffServices.businessId, context.businessId), eq(staffServices.staffId, targetStaffId), eq(staffServices.serviceId, current.serviceId))).limit(1);
+    if (!assignment) throw new Error("Operatore non abilitato per questo servizio.");
     const startsAt = zonedLocalToUtc(input.startsAt, context.timezone);
     const endsAt = new Date(startsAt.getTime() + current.durationMinutes * 60_000);
     if (startsAt <= new Date()) throw new Error("Scegli una data futura.");
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${current.staffId}))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${targetStaffId}))`);
     const [conflict] = await tx.select({ id: appointments.id }).from(appointments).where(and(
-      eq(appointments.businessId, context.businessId), eq(appointments.staffId, current.staffId), ne(appointments.id, input.id),
+      eq(appointments.businessId, context.businessId), eq(appointments.staffId, targetStaffId), ne(appointments.id, input.id),
       lt(appointments.startsAt, endsAt), gt(appointments.endsAt, startsAt), sql`not ${appointments.status} in ('COMPLETED','CANCELLED','NO_SHOW')`,
     )).limit(1);
     if (conflict) throw new Error("Fascia non disponibile.");
-    await tx.update(appointments).set({ startsAt, endsAt, version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, input.id));
-    await tx.insert(appointmentEvents).values({ appointmentId: input.id, businessId: context.businessId, type: "RESCHEDULED", actorId: context.user.id, note: input.startsAt });
+    await tx.update(appointments).set({ staffId: targetStaffId, startsAt, endsAt, version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, input.id));
+    await tx.insert(appointmentEvents).values({ appointmentId: input.id, businessId: context.businessId, type: "RESCHEDULED", actorId: context.user.id, note: `${input.startsAt} · operatore ${targetStaffId}` });
   });
   revalidatePath("/app/agenda");
 }
