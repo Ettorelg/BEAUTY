@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -8,6 +8,7 @@ import { appointments, businessMemberships, serviceCategories, services, staffAb
 import { requireBusinessContext } from "@/lib/business-context";
 import { issueStaffInvitation } from "@/lib/staff-invitations";
 import { parseTimeToMinutes } from "@/modules/availability/domain/time-slots";
+import { validateDailyShifts } from "@/modules/availability/domain/staff-shifts";
 
 const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
 
@@ -136,12 +137,40 @@ function parseWorkingHours(formData: FormData) {
   return { weekday: weekdayValues[input.weekday], startMinutes, endMinutes };
 }
 
+async function assertWorkingHoursAvailable(businessId: string, staffId: string, input: { weekday: number; startMinutes: number; endMinutes: number }, excludeId?: string) {
+  const existing = await db.select({ id: workingHours.id, startMinutes: workingHours.startMinutes, endMinutes: workingHours.endMinutes })
+    .from(workingHours).where(and(eq(workingHours.businessId, businessId), eq(workingHours.staffId, staffId), eq(workingHours.weekday, input.weekday)));
+  validateDailyShifts([...existing.filter((slot) => slot.id !== excludeId).map(({ startMinutes, endMinutes }) => ({ startMinutes, endMinutes })), { startMinutes: input.startMinutes, endMinutes: input.endMinutes }]);
+}
+
+export async function saveWorkingDay(formData: FormData) {
+  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const input = z.object({ staffId: z.string().uuid(), weekday: z.coerce.number().int().min(0).max(6), firstStart: z.string(), firstEnd: z.string(), secondStart: z.string().optional(), secondEnd: z.string().optional() }).parse({
+    staffId: formData.get("staffId"), weekday: formData.get("weekday"), firstStart: formData.get("firstStart"), firstEnd: formData.get("firstEnd"), secondStart: formData.get("secondStart") || undefined, secondEnd: formData.get("secondEnd") || undefined,
+  });
+  if (Boolean(input.secondStart) !== Boolean(input.secondEnd)) throw new Error("Completa sia inizio sia fine del secondo turno.");
+  const weekday = weekdayValues[input.weekday];
+  const shifts = validateDailyShifts([
+    { startMinutes: parseTimeToMinutes(input.firstStart), endMinutes: parseTimeToMinutes(input.firstEnd) },
+    ...(input.secondStart && input.secondEnd ? [{ startMinutes: parseTimeToMinutes(input.secondStart), endMinutes: parseTimeToMinutes(input.secondEnd) }] : []),
+  ]);
+  const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.id, input.staffId), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).limit(1);
+  if (!staff) throw new Error("Operatore non valido.");
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${input.staffId}:${weekday}`}))`);
+    await tx.delete(workingHours).where(and(eq(workingHours.businessId, context.businessId), eq(workingHours.staffId, input.staffId), eq(workingHours.weekday, weekday)));
+    await tx.insert(workingHours).values(shifts.map((shift) => ({ businessId: context.businessId, staffId: input.staffId, weekday, ...shift })));
+  });
+  refreshStaffPages();
+}
+
 export async function addWorkingHours(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const staffId = z.string().uuid().parse(formData.get("staffId"));
   const input = parseWorkingHours(formData);
   const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.id, staffId), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).limit(1);
   if (!staff) throw new Error("Operatore non valido.");
+  await assertWorkingHoursAvailable(context.businessId, staffId, input);
   await db.insert(workingHours).values({ businessId: context.businessId, staffId, ...input });
   refreshStaffPages();
 }
@@ -150,6 +179,9 @@ export async function updateWorkingHours(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const id = z.string().uuid().parse(formData.get("id"));
   const input = parseWorkingHours(formData);
+  const [current] = await db.select({ staffId: workingHours.staffId }).from(workingHours).where(and(eq(workingHours.id, id), eq(workingHours.businessId, context.businessId))).limit(1);
+  if (!current) throw new Error("Turno non trovato.");
+  await assertWorkingHoursAvailable(context.businessId, current.staffId, input, id);
   await db.update(workingHours).set(input).where(and(eq(workingHours.id, id), eq(workingHours.businessId, context.businessId)));
   refreshStaffPages();
 }
