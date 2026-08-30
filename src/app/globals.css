@@ -234,3 +234,5 @@ button { cursor: pointer; }
 .customer-profile-card { margin: 0 0 28px; }
 .customer-profile-card h2 { margin-top: 0; }
 .customer-profile-card p { margin: 7px 0; }
+
+.public-loyalty{display:flex;align-items:center;gap:16px;margin:18px 0;padding:14px 18px}.public-loyalty span{font-size:1.2rem;font-weight:800;color:var(--accent)}.public-loyalty small{color:#756a65}
