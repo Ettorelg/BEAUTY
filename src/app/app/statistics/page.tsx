@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db/client";
-import { appointments, staffMembers } from "@/db/schema";
+import { appointments, serviceCategories, services, staffMembers } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { AppNav } from "../app-nav";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
@@ -34,10 +34,14 @@ export default async function StatisticsPage({ searchParams }: { searchParams: P
     startsAt: appointments.startsAt,
     status: appointments.status,
     service: appointments.serviceName,
+    categoryId: serviceCategories.id,
+    category: serviceCategories.name,
     staff: staffMembers.name,
     staffId: staffMembers.id,
   }).from(appointments)
     .innerJoin(staffMembers, and(eq(appointments.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId)))
+    .innerJoin(services, and(eq(appointments.serviceId, services.id), eq(services.businessId, context.businessId)))
+    .innerJoin(serviceCategories, and(eq(services.categoryId, serviceCategories.id), eq(serviceCategories.businessId, context.businessId)))
     .where(eq(appointments.businessId, context.businessId))
     .orderBy(asc(appointments.startsAt));
   const rows = allRows.filter((row) => row.startsAt >= periodStart && row.startsAt < periodEnd);
@@ -68,6 +72,12 @@ export default async function StatisticsPage({ searchParams }: { searchParams: P
     return map;
   }, {})).sort((a, b) => b.count - a.count);
 
+  const byCategory = Object.values(completed.reduce<Record<string, Ranked>>((map, row) => {
+    map[row.categoryId] ??= { name: row.category, count: 0, amount: 0 };
+    map[row.categoryId].count++;
+    map[row.categoryId].amount += Number(row.price);
+    return map;
+  }, {})).sort((a, b) => b.amount - a.amount);
   const customerVisits = completed.reduce<Record<string, { count: number; last: Date; first: Date }>>((map, row) => {
     const current = map[row.customerId];
     if (!current) map[row.customerId] = { count: 1, first: row.startsAt, last: row.startsAt };
@@ -122,6 +132,14 @@ export default async function StatisticsPage({ searchParams }: { searchParams: P
       <article className="panel"><h2>Servizi più richiesti</h2>{byService.slice(0, 8).map((row) => <div className="statistics-line" key={row.name}><span><strong>{row.name}</strong><small>{percentage(row.count, completed.length)}% degli eseguiti</small></span><strong>{row.count} · {money(row.amount)}</strong></div>)}</article>
     </section>
 
+    {byCategory.length ? <section className="panel statistics-category-panel">
+      <div className="dashboard-section-heading"><div><p className="eyebrow">Rendimento del listino</p><h2>Incassi per categoria</h2></div><p className="muted">Nel periodo selezionato</p></div>
+      <div className="statistics-category-list">{byCategory.map((row) => <div className="statistics-category-row" key={row.name}>
+        <div><strong>{row.name}</strong><small>{row.count} {row.count === 1 ? "servizio eseguito" : "servizi eseguiti"} · media {money(row.amount / row.count)}</small></div>
+        <div className="statistics-category-progress"><i style={{ width: `${percentage(row.amount, totalRevenue)}%` }}/></div>
+        <strong>{money(row.amount)}</strong><span>{percentage(row.amount, totalRevenue)}% del totale</span>
+      </div>)}</div>
+    </section> : null}
     <section className="management-grid">
       <article className="panel"><h2>Giorni più richiesti</h2>{Object.entries(weekdays).sort((a, b) => b[1] - a[1]).map(([day, count]) => <div className="statistics-line" key={day}><span className="capitalize">{day}</span><strong>{count} · {percentage(count, completed.length)}%</strong></div>)}</article>
       <article className="panel"><h2>Fasce orarie</h2>{["Mattina", "Pomeriggio", "Sera"].map((band) => <div className="statistics-line" key={band}><span>{band}</span><strong>{timeBands[band] ?? 0} · {percentage(timeBands[band] ?? 0, completed.length)}%</strong></div>)}</article>

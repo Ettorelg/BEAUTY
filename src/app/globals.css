@@ -312,3 +312,16 @@ button { cursor: pointer; }
   .dashboard-appointment-list > a { grid-template-columns: 54px minmax(0, 1fr); }
   .dashboard-appointment-list em { grid-column: 2; width: max-content; }
 }
+.statistics-category-panel { margin: 18px 0; }
+.statistics-category-list { display: grid; }
+.statistics-category-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, 1.4fr) auto 110px; align-items: center; gap: 18px; padding: 16px 0; border-top: 1px solid #eee7e3; }
+.statistics-category-row > div:first-child { display: grid; gap: 4px; }
+.statistics-category-row small, .statistics-category-row > span { color: #756a65; }
+.statistics-category-row > span { text-align: right; font-size: .82rem; font-weight: 700; }
+.statistics-category-progress { height: 11px; overflow: hidden; border-radius: 999px; background: #f0e8e4; }
+.statistics-category-progress i { display: block; min-width: 3px; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), #b99380); }
+@media (max-width: 760px) {
+  .statistics-category-row { grid-template-columns: 1fr auto; gap: 8px 14px; }
+  .statistics-category-progress { grid-column: 1 / -1; grid-row: 2; }
+  .statistics-category-row > span { grid-column: 1 / -1; text-align: left; }
+}
