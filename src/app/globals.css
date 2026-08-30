@@ -116,7 +116,15 @@ button { cursor: pointer; }
 .data-row h3, .data-row p { margin: 0 0 6px; }
 .data-row .eyebrow { font-size: .7rem; }
 .empty-state { padding: 32px; border: 1px dashed #cdbfb7; border-radius: 16px; color: #756a65; text-align: center; }
-.staff-row { align-items: flex-start; }
+.staff-row { align-items: flex-start; padding: 14px 16px; }
+.staff-row .staff-card-main > h3 { margin-bottom: 2px; }
+.staff-compact-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.staff-compact-stats span { padding: 4px 8px; border-radius: 999px; background: #f3eeeb; color: #6f5145; font-size: .78rem; font-weight: 700; }
+.staff-compact-details { margin-top: 10px; border-top: 1px solid #eee7e3; padding-top: 9px; }
+.staff-compact-details > summary { color: var(--accent); cursor: pointer; font-weight: 800; }
+.staff-compact-body { padding-top: 4px; }
+.staff-compact-body .staff-services { margin: 12px 0; }
+.staff-compact-body .edit-disclosure { margin-top: 10px; padding-top: 10px; }
 .staff-card-main { min-width: 0; flex: 1; }
 .staff-services { display: grid; gap: 9px; margin: 18px 0; }
 .staff-services > p { margin: 0; }
