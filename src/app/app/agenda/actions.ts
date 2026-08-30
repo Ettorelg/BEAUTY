@@ -27,6 +27,7 @@ const finalStatuses = ["COMPLETED", "CANCELLED", "NO_SHOW"] as const;
 const bookingSchema = z.object({
   staffId: z.string().uuid(),
   serviceId: z.string().uuid(),
+  customerId: z.string().uuid().optional(),
   customerName: z.string().trim().min(2).max(100),
   email: z.string().trim().email().optional(),
   phone: z.string().trim().min(6).max(30).optional(),
@@ -49,7 +50,7 @@ export async function createAppointment(formData: FormData) {
   const context = await requireBusinessContext();
   if (context.role !== "OWNER") throw new Error("Solo il titolare può creare appuntamenti manuali.");
   const input = bookingSchema.parse({
-    staffId: formData.get("staffId"), serviceId: formData.get("serviceId"), customerName: formData.get("customerName"),
+    staffId: formData.get("staffId"), serviceId: formData.get("serviceId"), customerId: formData.get("customerId") || undefined, customerName: formData.get("customerName"),
     email: formData.get("email") || undefined, phone: formData.get("phone") || undefined,
     startsAt: formData.get("startsAt"), notes: formData.get("notes") || undefined, idempotencyKey: formData.get("idempotencyKey"),
   });
@@ -76,9 +77,15 @@ export async function createAppointment(formData: FormData) {
       email ? eq(sql`lower(${customerRelations.email})`, email) : undefined,
       phone ? eq(sql`regexp_replace(coalesce(${customerRelations.phone}, ''), '\\D', '', 'g')`, phone) : undefined,
     );
-    const knownRows = identity ? await tx.select({ id: customerRelations.id }).from(customerRelations)
-      .where(and(eq(customerRelations.businessId, context.businessId), identity)).limit(2) : [];
-    if (knownRows.length > 1) throw new Error("Più clienti corrispondono ai dati inseriti: usa email o telefono univoci.");
+    const knownRows = input.customerId
+      ? await tx.select({ id: customerRelations.id }).from(customerRelations)
+        .where(and(eq(customerRelations.businessId, context.businessId), eq(customerRelations.id, input.customerId))).limit(1)
+      : identity
+        ? await tx.select({ id: customerRelations.id }).from(customerRelations)
+          .where(and(eq(customerRelations.businessId, context.businessId), identity)).limit(2)
+        : [];
+    if (input.customerId && knownRows.length === 0) throw new Error("Il cliente selezionato non è più disponibile.");
+    if (!input.customerId && knownRows.length > 1) throw new Error("Più clienti corrispondono ai dati inseriti: seleziona il cliente dalla lista.");
     const [known] = knownRows;
     const customerId = known?.id ?? (await tx.insert(customerRelations).values({
       businessId: context.businessId, name: input.customerName, email, phone,

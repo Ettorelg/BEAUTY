@@ -17,6 +17,7 @@ export function CustomerAutofill() {
   const [results, setResults] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
 
   useEffect(() => {
     const value = query.trim();
@@ -54,6 +55,7 @@ export function CustomerAutofill() {
   }, [query]);
 
   function choose(customer: Customer) {
+    setSelectedCustomerId(customer.id);
     setName(customer.name);
     setEmail(customer.email ?? "");
     setPhone(customer.phone ?? "");
@@ -64,6 +66,7 @@ export function CustomerAutofill() {
 
   return (
     <fieldset className="compact-form stacked">
+      <input type="hidden" name="customerId" value={selectedCustomerId} />
       <legend>Cliente</legend>
       <input
         name="customerName"
