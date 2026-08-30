@@ -22,6 +22,7 @@ import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 import { sendBookingConfirmation } from "@/lib/staff-invitations";
 import { isAppointmentStatus } from "@/modules/appointments/domain/status";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
+import { calculateEarnedPoints } from "@/modules/fidelity/domain/rewards";
 
 const finalStatuses = ["COMPLETED", "CANCELLED", "NO_SHOW"] as const;
 const bookingSchema = z.object({
@@ -46,7 +47,7 @@ async function staffIdForCurrentUser(businessId: string, userId: string) {
   return member?.id;
 }
 
-export async function createAppointment(formData: FormData) {
+async function createAppointmentOrThrow(formData: FormData) {
   const context = await requireBusinessContext();
   if (context.role !== "OWNER") throw new Error("Solo il titolare può creare appuntamenti manuali.");
   const input = bookingSchema.parse({
@@ -103,6 +104,16 @@ export async function createAppointment(formData: FormData) {
   revalidatePath("/app/agenda");
 }
 
+export async function createAppointment(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await createAppointmentOrThrow(formData);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) return { ok: false, error: "Controlla i dati del cliente e riprova." };
+    return { ok: false, error: error instanceof Error ? error.message : "Creazione appuntamento non riuscita." };
+  }
+}
+
 export async function changeAppointmentStatus(formData: FormData) {
   const context = await requireBusinessContext();
   const id = z.string().uuid().parse(formData.get("id"));
@@ -120,7 +131,7 @@ export async function changeAppointmentStatus(formData: FormData) {
     if (next === "COMPLETED" && current.status !== "COMPLETED") {
       const [settings] = await tx.select().from(fidelitySettings).where(eq(fidelitySettings.businessId, context.businessId)).limit(1);
       if (settings) {
-        const earned = Math.floor(Math.round(Number(current.price) * 100) / settings.spendCents) * settings.pointsAward;
+        const earned = calculateEarnedPoints(Number(current.price), settings.spendCents, settings.pointsAward);
         await tx.insert(fidelityCards).values({ businessId: context.businessId, customerRelationId: current.customerId, cardNumber: `AB-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, points: earned })
           .onConflictDoUpdate({ target: [fidelityCards.businessId, fidelityCards.customerRelationId], set: { points: sql`${fidelityCards.points} + ${earned}`, updatedAt: new Date() } });
       }

@@ -43,6 +43,7 @@ export const appointments = pgTable(
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     idempotencyKey: text("idempotency_key").notNull(),
     version: integer("version").notNull().default(1),
+    reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

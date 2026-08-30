@@ -18,6 +18,9 @@ export function ensureFidelitySchema(){
       await client.query('CREATE TABLE IF NOT EXISTS "fidelity_promotions" ("id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),"business_id" uuid NOT NULL REFERENCES "businesses"("id") ON DELETE CASCADE,"service_id" uuid NOT NULL REFERENCES "services"("id") ON DELETE CASCADE,"discount_percent" integer NOT NULL,"starts_at" timestamptz NOT NULL,"ends_at" timestamptz NOT NULL,"active" boolean NOT NULL DEFAULT true,"created_at" timestamptz NOT NULL DEFAULT now())');
       await client.query('ALTER TABLE "fidelity_promotions" ADD COLUMN IF NOT EXISTS "created_at" timestamptz NOT NULL DEFAULT now()');
       await client.query('CREATE INDEX IF NOT EXISTS "fidelity_promotions_business_idx" ON "fidelity_promotions" ("business_id")');
+      await client.query('ALTER TABLE "appointments" ADD COLUMN IF NOT EXISTS "reminder_sent_at" timestamptz');
+      await client.query('CREATE TABLE IF NOT EXISTS "fidelity_redemptions" ("id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),"business_id" uuid NOT NULL REFERENCES "businesses"("id") ON DELETE CASCADE,"customer_relation_id" uuid NOT NULL REFERENCES "customer_relations"("id") ON DELETE CASCADE,"rule_id" uuid REFERENCES "fidelity_rules"("id") ON DELETE SET NULL,"points_spent" integer NOT NULL,"reward_type" text NOT NULL,"reward_value" integer NOT NULL DEFAULT 0,"service_id" uuid REFERENCES "services"("id") ON DELETE SET NULL,"created_at" timestamptz NOT NULL DEFAULT now())');
+      await client.query('CREATE INDEX IF NOT EXISTS "fidelity_redemptions_business_customer_idx" ON "fidelity_redemptions" ("business_id","customer_relation_id")');
     }finally{await client.end()}
   })().catch(error=>{ready=undefined;throw error});
   return ready;
