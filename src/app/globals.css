@@ -191,3 +191,5 @@ button { cursor: pointer; }
 .auth-role-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 24px; }
 .auth-role-list span { border: 1px solid #e5d5ce; border-radius: 999px; padding: 7px 10px; color: #6f5145; font-size: .78rem; font-weight: 700; }
 .customer-mode-button { font-weight: 800; box-shadow: 0 8px 20px rgb(180 111 99 / 28%); }
+
+.success-message { color: #276749; font-weight: 700; margin: 0 0 14px; }
