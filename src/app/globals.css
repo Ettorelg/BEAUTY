@@ -325,3 +325,8 @@ button { cursor: pointer; }
   .statistics-category-progress { grid-column: 1 / -1; grid-row: 2; }
   .statistics-category-row > span { grid-column: 1 / -1; text-align: left; }
 }
+.booking-reward-picker { display: grid; gap: 12px; margin: 18px 0 4px; padding: 18px; border: 1px solid #d8c3b7; border-radius: 16px; background: #fffaf7; }
+.booking-reward-picker h3, .booking-reward-picker p { margin: 0; }
+.booking-reward-picker select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #cdb9ae; border-radius: 11px; background: white; }
+.booking-final-price { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 12px; border-top: 1px solid #eaded8; }
+.booking-final-price strong { color: var(--accent); font-size: 1.35rem; }
