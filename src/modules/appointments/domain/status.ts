@@ -2,7 +2,7 @@ export const appointmentStatuses = ["BOOKED", "CONFIRMED", "ARRIVED", "COMPLETED
 export type AppointmentStatus = (typeof appointmentStatuses)[number];
 
 const transitions: Record<AppointmentStatus, readonly AppointmentStatus[]> = {
-  BOOKED: ["CONFIRMED", "CANCELLED", "NO_SHOW"],
+  BOOKED: ["COMPLETED", "CANCELLED", "NO_SHOW"],
   CONFIRMED: ["ARRIVED", "COMPLETED", "CANCELLED", "NO_SHOW"],
   ARRIVED: ["COMPLETED", "CANCELLED", "NO_SHOW"],
   COMPLETED: [],

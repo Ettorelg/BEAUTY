@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { canTransitionAppointment, isAppointmentStatus } from "./status";
 
 describe("appointment status", () => {
-  it("allows the normal service flow", () => {
-    expect(canTransitionAppointment("BOOKED", "CONFIRMED")).toBe(true);
-    expect(canTransitionAppointment("CONFIRMED", "ARRIVED")).toBe(true);
-    expect(canTransitionAppointment("ARRIVED", "COMPLETED")).toBe(true);
+  it("allows the simplified service flow", () => {
+    expect(canTransitionAppointment("BOOKED", "COMPLETED")).toBe(true);
+    expect(canTransitionAppointment("BOOKED", "CANCELLED")).toBe(true);
+    expect(canTransitionAppointment("BOOKED", "NO_SHOW")).toBe(true);
   });
 
   it("does not reopen terminal appointments", () => {

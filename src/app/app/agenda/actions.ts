@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, lt, lte, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -13,6 +13,8 @@ import {
   services,
   staffMembers,
   staffServices,
+  staffAbsences,
+  workingHours,
   businesses,
 } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
@@ -74,8 +76,10 @@ export async function createAppointment(formData: FormData) {
       email ? eq(sql`lower(${customerRelations.email})`, email) : undefined,
       phone ? eq(sql`regexp_replace(coalesce(${customerRelations.phone}, ''), '\\D', '', 'g')`, phone) : undefined,
     );
-    const [known] = identity ? await tx.select({ id: customerRelations.id }).from(customerRelations)
-      .where(and(eq(customerRelations.businessId, context.businessId), identity)).limit(1) : [];
+    const knownRows = identity ? await tx.select({ id: customerRelations.id }).from(customerRelations)
+      .where(and(eq(customerRelations.businessId, context.businessId), identity)).limit(2) : [];
+    if (knownRows.length > 1) throw new Error("Più clienti corrispondono ai dati inseriti: usa email o telefono univoci.");
+    const [known] = knownRows;
     const customerId = known?.id ?? (await tx.insert(customerRelations).values({
       businessId: context.businessId, name: input.customerName, email, phone,
     }).returning({ id: customerRelations.id }))[0].id;
@@ -110,7 +114,7 @@ export async function changeAppointmentStatus(formData: FormData) {
       const [settings] = await tx.select().from(fidelitySettings).where(eq(fidelitySettings.businessId, context.businessId)).limit(1);
       if (settings) {
         const earned = Math.floor(Math.round(Number(current.price) * 100) / settings.spendCents) * settings.pointsAward;
-        if (earned > 0) await tx.insert(fidelityCards).values({ businessId: context.businessId, customerRelationId: current.customerId, cardNumber: `AB-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, points: earned })
+        await tx.insert(fidelityCards).values({ businessId: context.businessId, customerRelationId: current.customerId, cardNumber: `AB-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, points: earned })
           .onConflictDoUpdate({ target: [fidelityCards.businessId, fidelityCards.customerRelationId], set: { points: sql`${fidelityCards.points} + ${earned}`, updatedAt: new Date() } });
       }
     }
@@ -138,6 +142,22 @@ export async function rescheduleAppointment(formData: FormData) {
     const startsAt = zonedLocalToUtc(input.startsAt, context.timezone);
     const endsAt = new Date(startsAt.getTime() + current.durationMinutes * 60_000);
     if (startsAt <= new Date()) throw new Error("Scegli una data futura.");
+    const localDate = input.startsAt.slice(0, 10);
+    const localTime = input.startsAt.slice(11, 16);
+    const weekday = new Date(`${localDate}T12:00:00Z`).getUTCDay();
+    const [hours, minutes] = localTime.split(":").map(Number);
+    const startMinutes = hours * 60 + minutes;
+    const endMinutes = startMinutes + current.durationMinutes;
+    const [workingSlot] = await tx.select({ id: workingHours.id }).from(workingHours).where(and(
+      eq(workingHours.businessId, context.businessId), eq(workingHours.staffId, targetStaffId), eq(workingHours.weekday, weekday),
+      lte(workingHours.startMinutes, startMinutes), gte(workingHours.endMinutes, endMinutes),
+    )).limit(1);
+    if (!workingSlot) throw new Error("Orario fuori dal turno dell’operatore.");
+    const [absence] = await tx.select({ id: staffAbsences.id }).from(staffAbsences).where(and(
+      eq(staffAbsences.businessId, context.businessId), eq(staffAbsences.staffId, targetStaffId),
+      lt(staffAbsences.startsAt, endsAt), gt(staffAbsences.endsAt, startsAt),
+    )).limit(1);
+    if (absence) throw new Error("Operatore assente nella fascia selezionata.");
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${targetStaffId}))`);
     const [conflict] = await tx.select({ id: appointments.id }).from(appointments).where(and(
       eq(appointments.businessId, context.businessId), eq(appointments.staffId, targetStaffId), ne(appointments.id, input.id),
