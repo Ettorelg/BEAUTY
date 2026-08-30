@@ -13,9 +13,11 @@ import {
   services,
   staffMembers,
   staffServices,
+  businesses,
 } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
+import { sendBookingConfirmation } from "@/lib/staff-invitations";
 import { isAppointmentStatus } from "@/modules/appointments/domain/status";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 
@@ -60,6 +62,7 @@ export async function createAppointment(formData: FormData) {
   const email = input.email?.toLowerCase();
   const phone = normalizePhone(input.phone);
 
+  let createdAppointment = false;
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.staffId}))`);
     const [conflict] = await tx.select({ id: appointments.id }).from(appointments).where(and(
@@ -83,8 +86,9 @@ export async function createAppointment(formData: FormData) {
       durationMinutes: selection.durationMinutes, price: selection.price, startsAt, endsAt,
       timezone: context.timezone, notes: input.notes, createdBy: context.user.id, idempotencyKey: input.idempotencyKey,
     }).onConflictDoNothing({ target: [appointments.businessId, appointments.idempotencyKey] }).returning({ id: appointments.id });
-    if (created) await tx.insert(appointmentEvents).values({ appointmentId: created.id, businessId: context.businessId, type: "CREATED", toStatus: "BOOKED", actorId: context.user.id });
+    if (created) { createdAppointment = true; await tx.insert(appointmentEvents).values({ appointmentId: created.id, businessId: context.businessId, type: "CREATED", toStatus: "BOOKED", actorId: context.user.id }); }
   });
+  if (createdAppointment && email) { const [business] = await db.select({ name: businesses.name, address: businesses.address, phone: businesses.phone }).from(businesses).where(eq(businesses.id, context.businessId)).limit(1); try { await sendBookingConfirmation({ email, businessName: business?.name ?? context.businessName, serviceName: selection.serviceName, startsAt, timezone: context.timezone, address: business?.address, phone: business?.phone }); } catch { /* The booking remains valid if the mail provider is unavailable. */ } }
   revalidatePath("/app/agenda");
 }
 
