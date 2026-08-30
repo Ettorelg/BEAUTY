@@ -226,3 +226,7 @@ button { cursor: pointer; }
   .agenda-shell .agenda-appointment select, .agenda-shell .agenda-appointment button { min-height: 42px; }
   .agenda-shell .agenda-navigation button, .agenda-shell .agenda-view-switch button { min-height: 44px; }
 }
+
+.customer-top-nav { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:24px; }
+.customer-top-nav > span { color:#756a65; font-size:.85rem; font-weight:700; }
+@media(max-width:700px){.customer-top-nav .ghost-button{min-height:42px;padding:9px 11px}.customer-top-nav form{margin-left:auto}}
