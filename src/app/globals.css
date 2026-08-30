@@ -197,3 +197,6 @@ button { cursor: pointer; }
 .fidelity-rules-summary { margin-top: 22px; padding-top: 18px; border-top: 1px solid #eaded8; }
 .fidelity-rules-summary h3 { margin: 0 0 8px; }
 .fidelity-rules-summary p { margin: 6px 0; }
+
+.fidelity-promotions { margin-top: 22px; padding-top: 18px; border-top: 1px solid #eaded8; }
+.fidelity-promotions h3 { margin: 0 0 8px; }
