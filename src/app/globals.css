@@ -193,3 +193,7 @@ button { cursor: pointer; }
 .customer-mode-button { font-weight: 800; box-shadow: 0 8px 20px rgb(180 111 99 / 28%); }
 
 .success-message { color: #276749; font-weight: 700; margin: 0 0 14px; }
+
+.fidelity-rules-summary { margin-top: 22px; padding-top: 18px; border-top: 1px solid #eaded8; }
+.fidelity-rules-summary h3 { margin: 0 0 8px; }
+.fidelity-rules-summary p { margin: 6px 0; }
