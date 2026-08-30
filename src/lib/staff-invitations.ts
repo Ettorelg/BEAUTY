@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { staffInvitations } from "@/db/schema/staff-invitations";
 
@@ -60,6 +60,7 @@ export async function issueStaffInvitation({ businessId, businessName, staffId, 
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hashStaffInvitationToken(token);
   const expiresAt = new Date(Date.now() + invitationLifetimeMs);
+  await db.delete(staffInvitations).where(and(eq(staffInvitations.businessId, businessId), eq(staffInvitations.email, normalizedEmail), ne(staffInvitations.staffId, staffId)));
   const [invitation] = await db.insert(staffInvitations).values({
     businessId,
     staffId,
