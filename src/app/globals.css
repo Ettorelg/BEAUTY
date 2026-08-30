@@ -218,3 +218,11 @@ button { cursor: pointer; }
   .customer-account-header .button-row { width: 100%; }
   .customer-account-header .button-row > * { width: 100%; text-align: center; }
 }
+@media (max-width: 700px) {
+  .agenda-shell .day-calendar:has(.staff-heading:only-child) { min-width: 100%; }
+  .agenda-shell .day-calendar:has(.staff-heading:only-child) .staff-heading { font-size: 1rem; }
+  .agenda-shell .day-calendar:has(.staff-heading:only-child) .calendar-cell { min-height: 58px; }
+  .agenda-shell .agenda-appointment { padding: 12px; border-radius: 12px; }
+  .agenda-shell .agenda-appointment select, .agenda-shell .agenda-appointment button { min-height: 42px; }
+  .agenda-shell .agenda-navigation button, .agenda-shell .agenda-view-switch button { min-height: 44px; }
+}
