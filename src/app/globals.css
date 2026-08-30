@@ -182,3 +182,11 @@ button { cursor: pointer; }
   .slot-grid { grid-template-columns: repeat(2, 1fr); }
   .date-picker { grid-template-columns: 1fr; }
 }
+.auth-professional { background: radial-gradient(circle at 15% 10%, #6f5145 0, #2a211e 42%, #151313 100%); }
+.auth-professional .auth-card { background: #fffaf7; border-color: #9b7665; }
+.auth-customer { background: radial-gradient(circle at 85% 0%, #f4d9d0 0, #fff8f5 48%, #f8eee9 100%); }
+.auth-customer .auth-card { border-color: #d9b5a8; box-shadow: 0 24px 70px rgb(111 75 61 / 16%); }
+.auth-identity-badge { display: inline-flex; padding: 7px 11px; border-radius: 999px; background: #6f5145; color: white; font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
+.auth-customer .auth-identity-badge { background: #b46f63; }
+.auth-role-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 24px; }
+.auth-role-list span { border: 1px solid #e5d5ce; border-radius: 999px; padding: 7px 10px; color: #6f5145; font-size: .78rem; font-weight: 700; }
