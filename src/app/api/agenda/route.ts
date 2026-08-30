@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { appointments, customerRelations, services, staffMembers, staffServices } from "@/db/schema";
+import { appointments, customerRelations, services, staffMembers, staffServices, staffInvitations } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone"; import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const requestedDate = request.nextUrl.searchParams.get("date") ?? today; const date = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : today;
   const view = request.nextUrl.searchParams.get("view") === "week" ? "week" : "day"; const startDate = view === "week" ? addDays(date, -(new Date(`${date}T12:00:00Z`).getUTCDay() || 7) + 1) : date; const endDate = addDays(startDate, view === "week" ? 7 : 1);
   const start = zonedLocalToUtc(`${startDate}T00:00`, context.timezone); const end = zonedLocalToUtc(`${endDate}T00:00`, context.timezone);
-  const [ownStaff] = isOwner ? [undefined] : await db.select({ id: staffMembers.id, name: staffMembers.name }).from(staffMembers).where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.userId, context.user.id), eq(staffMembers.active, true))).limit(1);
+  let [ownStaff] = isOwner ? [undefined] : await db.select({ id: staffMembers.id, name: staffMembers.name }).from(staffMembers).where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.userId, context.user.id), eq(staffMembers.active, true))).limit(1); if (!isOwner && !ownStaff) { [ownStaff] = await db.select({ id: staffMembers.id, name: staffMembers.name }).from(staffInvitations).innerJoin(staffMembers, and(eq(staffInvitations.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).where(and(eq(staffInvitations.businessId, context.businessId), eq(staffInvitations.email, context.user.email.toLowerCase()), eq(staffInvitations.acceptedAt, staffInvitations.acceptedAt))).limit(1); }
   if (!isOwner && !ownStaff) return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: false, staff: [], catalog: [], entries: [] });
   const staffCondition = isOwner ? eq(staffMembers.businessId, context.businessId) : and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.id, ownStaff!.id));
   const [staff, catalog, entries] = await Promise.all([
