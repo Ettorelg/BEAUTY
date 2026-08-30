@@ -18,9 +18,9 @@ export default async function StatisticsPage({ searchParams }: { searchParams: P
   const now = new Date();
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: context.timezone }).format(now);
   const validDate = (value?: string) => /^\d{4}-\d{2}-\d{2}$/.test(value ?? "");
-  let from = validDate(query.from) ? query.from! : `${todayKey.slice(0, 7)}-01`;
+  let from = validDate(query.from) ? query.from! : todayKey;
   let to = validDate(query.to) ? query.to! : todayKey;
-  if (from > to) { from = `${todayKey.slice(0, 7)}-01`; to = todayKey; }
+  if (from > to) { from = todayKey; to = todayKey; }
   const addDay = (value: string) => { const date = new Date(`${value}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + 1); return date.toISOString().slice(0, 10); };
   const periodStart = zonedLocalToUtc(`${from}T00:00`, context.timezone);
   const periodEnd = zonedLocalToUtc(`${addDay(to)}T00:00`, context.timezone);
