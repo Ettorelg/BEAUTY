@@ -1,0 +1,2 @@
+import { S3Client } from "@aws-sdk/client-s3";
+export function bucket(){const endpoint=process.env.ENDPOINT,bucketName=process.env.BUCKET,key=process.env.ACCESS_KEY_ID,secret=process.env.SECRET_ACCESS_KEY;if(!endpoint||!bucketName||!key||!secret)throw Error("Bucket Railway non configurato.");return {bucketName,client:new S3Client({region:process.env.REGION??"auto",endpoint,credentials:{accessKeyId:key,secretAccessKey:secret}})}}
