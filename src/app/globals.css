@@ -200,3 +200,21 @@ button { cursor: pointer; }
 
 .fidelity-promotions { margin-top: 22px; padding-top: 18px; border-top: 1px solid #eaded8; }
 .fidelity-promotions h3 { margin: 0 0 8px; }
+@media (max-width: 700px) {
+  body { overflow-x: hidden; }
+  .dashboard-shell, .public-shell, .customer-account-shell { width: min(100% - 20px, 900px); }
+  .app-header { gap: 12px; align-items: center; flex-wrap: wrap; }
+  .app-header .button-row { width: 100%; justify-content: space-between; }
+  .app-nav { overflow-x: auto; white-space: nowrap; justify-content: flex-start; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
+  .app-nav a { flex: 0 0 auto; min-height: 42px; padding: 10px 12px; }
+  .agenda-shell { width: 100%; padding-left: 10px; padding-right: 10px; }
+  .agenda-toolbar { flex-wrap: wrap; gap: 10px; }
+  .agenda-toolbar h2 { order: -1; width: 100%; text-align: center; font-size: 1.25rem; }
+  .agenda-scroll { overflow-x: auto; }
+  .day-calendar { min-width: 560px; }
+  .new-booking-fab { right: 14px; bottom: 14px; font-size: .9rem; padding: 14px 18px; }
+  .service-card, .booking-panel, .panel { padding: 18px; }
+  .slot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .customer-account-header .button-row { width: 100%; }
+  .customer-account-header .button-row > * { width: 100%; text-align: center; }
+}
