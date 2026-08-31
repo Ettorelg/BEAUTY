@@ -157,7 +157,6 @@ export function AgendaCalendar({ today }: { today: string }) {
   const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value);
   const time = (value: string) => new Intl.DateTimeFormat("it-IT", { timeZone: data?.timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(value));
   const dayForEntry = (entry: Entry) => new Intl.DateTimeFormat("en-CA", { timeZone: data?.timezone }).format(new Date(entry.startsAt));
-  const hours = useMemo(() => Array.from({ length: 49 }, (_, index) => 480 + index * 15), []);
   const expected = useMemo(() => {
     const visibleStaffIds = new Set((data?.staff ?? []).map((member) => member.id));
     const rows = data?.entries.filter((entry) => visibleStaffIds.has(entry.staffId) && !["CANCELLED", "NO_SHOW"].includes(entry.status)) ?? [];
@@ -176,6 +175,11 @@ export function AgendaCalendar({ today }: { today: string }) {
   const dateLabel = data.view === "month"
     ? new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${data.startDate}T12:00:00Z`))
     : new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+  const dayTimes = Array.from(new Set(
+    data.entries
+      .filter((entry) => dayForEntry(entry) === date)
+      .map((entry) => time(entry.startsAt)),
+  )).sort((left, right) => left.localeCompare(right));
 
   function movePeriod(direction: -1 | 1) {
     if (view === "month") setDate(addCalendarMonths(date, direction));
@@ -265,9 +269,9 @@ export function AgendaCalendar({ today }: { today: string }) {
       <div className="day-calendar" style={{ gridTemplateColumns: `76px repeat(${Math.max(data.staff.length, 1)}, minmax(190px,1fr))` }}>
         <div className="calendar-corner">Ora</div>
         {data.staff.map((member) => <div className="staff-heading" key={member.id}>{member.name}</div>)}
-        {hours.map((minutes) => {
-          const slotTime = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-          return <div className="calendar-row" key={minutes} style={{ gridColumn: "1 / -1", gridTemplateColumns: `76px repeat(${Math.max(data.staff.length, 1)}, minmax(190px,1fr))` }}>
+        {dayTimes.length === 0 ? <div className="empty-state" style={{ gridColumn: "1 / -1" }}>Nessun appuntamento per questa giornata.</div> : null}
+        {dayTimes.map((slotTime) => {
+          return <div className="calendar-row" key={slotTime} style={{ gridColumn: "1 / -1", gridTemplateColumns: `76px repeat(${Math.max(data.staff.length, 1)}, minmax(190px,1fr))` }}>
             <time>{slotTime}</time>
             {data.staff.map((member) => <div className="calendar-cell" key={member.id}>
               {data.entries.filter((entry) => entry.staffId === member.id && time(entry.startsAt) === slotTime).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id}>
