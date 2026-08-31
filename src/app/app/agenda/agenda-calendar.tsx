@@ -157,7 +157,7 @@ export function AgendaCalendar({ today }: { today: string }) {
   const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value);
   const time = (value: string) => new Intl.DateTimeFormat("it-IT", { timeZone: data?.timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(value));
   const dayForEntry = (entry: Entry) => new Intl.DateTimeFormat("en-CA", { timeZone: data?.timezone }).format(new Date(entry.startsAt));
-  const hours = useMemo(() => Array.from({ length: 25 }, (_, index) => 480 + index * 30), []);
+  const hours = useMemo(() => Array.from({ length: 49 }, (_, index) => 480 + index * 15), []);
   const expected = useMemo(() => {
     const visibleStaffIds = new Set((data?.staff ?? []).map((member) => member.id));
     const rows = data?.entries.filter((entry) => visibleStaffIds.has(entry.staffId) && !["CANCELLED", "NO_SHOW"].includes(entry.status)) ?? [];
