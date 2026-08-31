@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { calculateBookingPriceCents } from "@/modules/fidelity/domain/booking-price";
 
 type Reward = {
   id: string;
@@ -27,7 +28,7 @@ function rewardLabel(reward: Reward) {
   return `${reward.points} punti · ${euro(reward.value / 100)} di sconto`;
 }
 
-export function BookingDetailsForm({ action, slug, serviceId, slots, name, email, phone, rewards, basePrice, promotionDiscount }: {
+export function BookingDetailsForm({ action, slug, serviceId, slots, name, email, phone, rewards, basePrice, promotionDiscount, allowRewardStacking }: {
   action: (formData: FormData) => void | Promise<void>;
   slug: string;
   serviceId: string;
@@ -38,6 +39,7 @@ export function BookingDetailsForm({ action, slug, serviceId, slots, name, email
   rewards: Reward[];
   basePrice: number;
   promotionDiscount: number;
+  allowRewardStacking: boolean;
 }) {
   const [selected, setSelected] = useState("");
   const [guest, setGuest] = useState(false);
@@ -47,13 +49,7 @@ export function BookingDetailsForm({ action, slug, serviceId, slots, name, email
   const canAuto = logged && phone.trim().length >= 6;
   const accountName = name.trim() || email.split("@")[0] || "Cliente";
   const reward = rewards.find((item) => item.id === rewardId);
-  const price = useMemo(() => {
-    let result = basePrice * (100 - promotionDiscount) / 100;
-    if (reward?.type === "FREE_SERVICE") result = 0;
-    if (reward?.type === "DISCOUNT_PERCENT") result *= (100 - reward.value) / 100;
-    if (reward?.type === "DISCOUNT_EUR") result = Math.max(0, result - reward.value / 100);
-    return result;
-  }, [basePrice, promotionDiscount, reward]);
+  const price = useMemo(() => calculateBookingPriceCents(Math.round(basePrice * 100), promotionDiscount, reward, allowRewardStacking) / 100, [basePrice, promotionDiscount, reward, allowRewardStacking]);
 
   async function google() {
     await authClient.signIn.social({ provider: "google", callbackURL: window.location.href });

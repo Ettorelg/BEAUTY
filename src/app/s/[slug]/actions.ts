@@ -14,6 +14,7 @@ import {
   fidelityPromotions,
   fidelityRedemptions,
   fidelityRules,
+  fidelitySettings,
   locations,
   services,
   staffMembers,
@@ -24,6 +25,7 @@ import { auth } from "@/lib/auth";
 import { sendBookingConfirmation } from "@/lib/staff-invitations";
 import { getPublicAvailability } from "@/modules/availability/application/public-availability";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
+import { calculateBookingPriceCents } from "@/modules/fidelity/domain/booking-price";
 
 const schema = z.object({
   slug: z.string().min(1),
@@ -100,18 +102,15 @@ export async function createPublicAppointment(formData: FormData) {
     const customerId = known?.id ?? (await tx.insert(customerRelations).values({ businessId: selection.businessId, userId: signedIn?.id ?? null, name: input.customerName, email, phone: input.phone }).returning({ id: customerRelations.id }))[0].id;
     if (known) await tx.update(customerRelations).set({ userId: signedIn?.id ?? null, name: input.customerName, phone: input.phone, updatedAt: new Date() }).where(eq(customerRelations.id, known.id));
 
-    let priceCents = Math.round(Number(selection.price) * 100);
-    if (promotion) priceCents = Math.round(priceCents * (100 - promotion.discount) / 100);
+    const [fidelityConfig] = await tx.select({ allowRewardStacking: fidelitySettings.allowRewardStacking }).from(fidelitySettings).where(eq(fidelitySettings.businessId, selection.businessId)).limit(1);
+    let priceCents = calculateBookingPriceCents(Math.round(Number(selection.price) * 100), promotion?.discount ?? 0);
     let reward: typeof fidelityRules.$inferSelect | undefined;
     if (input.rewardRuleId) {
       [reward] = await tx.select().from(fidelityRules).where(and(eq(fidelityRules.id, input.rewardRuleId), eq(fidelityRules.businessId, selection.businessId))).limit(1);
       if (!reward || (reward.serviceId && reward.serviceId !== input.serviceId)) throw Error("Il bonus selezionato non è valido per questo servizio.");
-      const [card] = await tx.select({ points: fidelityCards.points }).from(fidelityCards).where(and(eq(fidelityCards.businessId, selection.businessId), eq(fidelityCards.customerRelationId, customerId))).limit(1);
-      if (!card || card.points < reward.points) throw Error("Punti Fidelity insufficienti.");
-      if (reward.type === "FREE_SERVICE") priceCents = 0;
-      else if (reward.type === "DISCOUNT_PERCENT") priceCents = Math.round(priceCents * (100 - reward.value) / 100);
-      else if (reward.type === "DISCOUNT_EUR") priceCents = Math.max(0, priceCents - reward.value);
-      else throw Error("Tipo di bonus non valido.");
+      const [card] = await tx.select({ points: fidelityCards.points, expiresAt: fidelityCards.pointsExpiresAt }).from(fidelityCards).where(and(eq(fidelityCards.businessId, selection.businessId), eq(fidelityCards.customerRelationId, customerId))).limit(1);
+      if (!card || (card.expiresAt && card.expiresAt < new Date()) || card.points < reward.points) throw Error("Punti Fidelity insufficienti o scaduti.");
+      priceCents = calculateBookingPriceCents(Math.round(Number(selection.price) * 100), promotion?.discount ?? 0, reward, fidelityConfig?.allowRewardStacking ?? false);
     }
 
     const [created] = await tx.insert(appointments).values({
@@ -137,7 +136,7 @@ export async function createPublicAppointment(formData: FormData) {
         .where(and(eq(fidelityCards.businessId, selection.businessId), eq(fidelityCards.customerRelationId, customerId), gte(fidelityCards.points, reward.points)))
         .returning({ id: fidelityCards.id });
       if (!updatedCard) throw Error("Punti Fidelity insufficienti.");
-      await tx.insert(fidelityRedemptions).values({ businessId: selection.businessId, customerRelationId: customerId, ruleId: reward.id, pointsSpent: reward.points, rewardType: reward.type, rewardValue: reward.value, serviceId: reward.serviceId });
+      await tx.insert(fidelityRedemptions).values({ businessId: selection.businessId, customerRelationId: customerId, ruleId: reward.id, appointmentId: created.id, pointsSpent: reward.points, rewardType: reward.type, rewardValue: reward.value, serviceId: reward.serviceId });
     }
     await tx.insert(appointmentEvents).values({ appointmentId: created.id, businessId: selection.businessId, type: "CREATED", toStatus: "BOOKED", note: reward ? `Premio Fidelity: ${reward.points} punti` : null });
   });

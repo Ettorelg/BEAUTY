@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gt, gte, inArray, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -9,6 +9,7 @@ import {
   appointments,
   customerRelations,
   fidelityCards,
+  fidelityRedemptions,
   fidelitySettings,
   services,
   staffMembers,
@@ -128,12 +129,20 @@ export async function changeAppointmentStatus(formData: FormData) {
     if (!current || (ownStaffId && current.staffId !== ownStaffId)) throw new Error("Appuntamento non disponibile.");
     await tx.update(appointments).set({ status: next, version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, id));
     await tx.insert(appointmentEvents).values({ appointmentId: id, businessId: context.businessId, type: "STATUS_CHANGED", fromStatus: current.status, toStatus: next, actorId: context.user.id });
-    if (next === "COMPLETED" && current.status !== "COMPLETED") {
+    if (next === "CANCELLED" && current.status !== "CANCELLED") {
+      const [redemption] = await tx.select().from(fidelityRedemptions).where(and(eq(fidelityRedemptions.appointmentId, id), isNull(fidelityRedemptions.reversedAt))).limit(1);
+      if (redemption) {
+        await tx.update(fidelityCards).set({ points: sql`${fidelityCards.points} + ${redemption.pointsSpent}`, updatedAt: new Date() }).where(and(eq(fidelityCards.businessId, context.businessId), eq(fidelityCards.customerRelationId, current.customerId)));
+        await tx.update(fidelityRedemptions).set({ reversedAt: new Date() }).where(eq(fidelityRedemptions.id, redemption.id));
+      }
+    }    if (next === "COMPLETED" && current.status !== "COMPLETED") {
       const [settings] = await tx.select().from(fidelitySettings).where(eq(fidelitySettings.businessId, context.businessId)).limit(1);
       if (settings) {
         const earned = calculateEarnedPoints(Number(current.price), settings.spendCents, settings.pointsAward);
-        await tx.insert(fidelityCards).values({ businessId: context.businessId, customerRelationId: current.customerId, cardNumber: `AB-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, points: earned })
-          .onConflictDoUpdate({ target: [fidelityCards.businessId, fidelityCards.customerRelationId], set: { points: sql`${fidelityCards.points} + ${earned}`, updatedAt: new Date() } });
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + settings.pointsValidityMonths);
+        await tx.insert(fidelityCards).values({ businessId: context.businessId, customerRelationId: current.customerId, cardNumber: `AB-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, points: earned, pointsExpiresAt: expiresAt })
+          .onConflictDoUpdate({ target: [fidelityCards.businessId, fidelityCards.customerRelationId], set: { points: sql`${fidelityCards.points} + ${earned}`, pointsExpiresAt: expiresAt, updatedAt: new Date() } });
       }
     }
   });
