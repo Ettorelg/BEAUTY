@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import { appointments, businesses, customerRelations } from "@/db/schema";
 
@@ -37,8 +37,8 @@ async function deliverReminder(row: {
     body: JSON.stringify({
       from,
       to: [row.email],
-      subject: `Promemoria appuntamento · ${row.businessName}`,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><h1>Il tuo appuntamento è tra circa un’ora</h1><p>Ciao ${escapeHtml(row.customerName)},</p><p><strong>${escapeHtml(row.businessName)}</strong><br/>${escapeHtml(row.serviceName)}<br/>${escapeHtml(when)}</p></div>`,
+      subject: `Promemoria appuntamento di domani · ${row.businessName}`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><h1>Il tuo appuntamento è tra circa 24 ore</h1><p>Ciao ${escapeHtml(row.customerName)},</p><p><strong>${escapeHtml(row.businessName)}</strong><br/>${escapeHtml(row.serviceName)}<br/>${escapeHtml(when)}</p></div>`,
       text: `Promemoria: il tuo appuntamento presso ${row.businessName} per ${row.serviceName} è previsto ${when}.`,
     }),
   });
@@ -46,7 +46,11 @@ async function deliverReminder(row: {
 }
 
 export function getReminderWindow(now: Date) {
-  return { from: new Date(now.getTime() + 50 * 60_000), to: new Date(now.getTime() + 70 * 60_000) };
+  const oneDay = 24 * 60 * 60_000;
+  return {
+    from: new Date(now.getTime() + oneDay - 10 * 60_000),
+    to: new Date(now.getTime() + oneDay + 10 * 60_000),
+  };
 }
 
 export async function sendDueAppointmentReminders(now = new Date()) {
@@ -65,14 +69,15 @@ export async function sendDueAppointmentReminders(now = new Date()) {
     .innerJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId))
     .innerJoin(businesses, eq(businesses.id, appointments.businessId))
     .where(and(
-      eq(appointments.status, "BOOKED"),
+      inArray(appointments.status, ["BOOKED", "CONFIRMED"]),
       isNull(appointments.reminderSentAt),
       gte(appointments.startsAt, from),
       lt(appointments.startsAt, to),
     ));
 
   for (const row of due) {
-    const [claimed] = await db.update(appointments)
+    const [claimed] = await db
+      .update(appointments)
       .set({ reminderSentAt: now })
       .where(and(eq(appointments.id, row.id), isNull(appointments.reminderSentAt)))
       .returning({ id: appointments.id });
