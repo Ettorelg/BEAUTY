@@ -119,6 +119,7 @@ export async function changeAppointmentStatus(formData: FormData) {
   const context = await requireBusinessContext();
   const id = z.string().uuid().parse(formData.get("id"));
   const next = z.string().parse(formData.get("status"));
+  const completionNote = z.string().trim().max(500).optional().parse(formData.get("completionNote") || undefined);
   if (!isAppointmentStatus(next) || !inArrayValue(finalStatuses, next)) throw new Error("Stato non valido.");
   const ownStaffId = context.role === "STAFF" ? await staffIdForCurrentUser(context.businessId, context.user.id) : undefined;
   if (context.role === "STAFF" && !ownStaffId) throw new Error("Profilo operatore non collegato.");
@@ -127,8 +128,8 @@ export async function changeAppointmentStatus(formData: FormData) {
     const [current] = await tx.select({ status: appointments.status, staffId: appointments.staffId, customerId: appointments.customerRelationId, price: appointments.price })
       .from(appointments).where(and(eq(appointments.id, id), eq(appointments.businessId, context.businessId))).limit(1);
     if (!current || (ownStaffId && current.staffId !== ownStaffId)) throw new Error("Appuntamento non disponibile.");
-    await tx.update(appointments).set({ status: next, version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, id));
-    await tx.insert(appointmentEvents).values({ appointmentId: id, businessId: context.businessId, type: "STATUS_CHANGED", fromStatus: current.status, toStatus: next, actorId: context.user.id });
+    await tx.update(appointments).set({ status: next, ...(next === "COMPLETED" && completionNote ? { notes: completionNote } : {}), version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, id));
+    await tx.insert(appointmentEvents).values({ appointmentId: id, businessId: context.businessId, type: "STATUS_CHANGED", fromStatus: current.status, toStatus: next, actorId: context.user.id, note: next === "COMPLETED" ? completionNote : undefined });
     if (next === "CANCELLED" && current.status !== "CANCELLED") {
       const [redemption] = await tx.select().from(fidelityRedemptions).where(and(eq(fidelityRedemptions.appointmentId, id), isNull(fidelityRedemptions.reversedAt))).limit(1);
       if (redemption) {

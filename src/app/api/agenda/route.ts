@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { appointments, customerRelations, services, staffInvitations, staffMembers, staffServices } from "@/db/schema";
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     ? eq(staffMembers.businessId, context.businessId)
     : and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.id, ownStaff!.id));
 
-  const [staff, catalog, entries] = await Promise.all([
+  const [staff, catalog, rawEntries] = await Promise.all([
     db
       .select({ id: staffMembers.id, name: staffMembers.name })
       .from(staffMembers)
@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
     db
       .select({
         id: appointments.id,
+        customerId: appointments.customerRelationId,
         startsAt: appointments.startsAt,
         endsAt: appointments.endsAt,
         status: appointments.status,
@@ -87,6 +88,30 @@ export async function GET(request: NextRequest) {
       )
       .orderBy(asc(appointments.startsAt)),
   ]);
+
+  const customerIds = [...new Set(rawEntries.map((entry) => entry.customerId))];
+  const serviceIds = [...new Set(rawEntries.map((entry) => entry.serviceId))];
+  const noteHistory = customerIds.length && serviceIds.length
+    ? await db.select({ customerId: appointments.customerRelationId, serviceId: appointments.serviceId, startsAt: appointments.startsAt, notes: appointments.notes })
+        .from(appointments)
+        .where(and(
+          eq(appointments.businessId, context.businessId),
+          eq(appointments.status, "COMPLETED"),
+          inArray(appointments.customerRelationId, customerIds),
+          inArray(appointments.serviceId, serviceIds),
+          isNotNull(appointments.notes),
+        ))
+        .orderBy(desc(appointments.startsAt))
+    : [];
+  const entries = rawEntries.map((entry) => ({
+    ...entry,
+    rememberedNote: noteHistory.find((item) =>
+      item.customerId === entry.customerId &&
+      item.serviceId === entry.serviceId &&
+      item.startsAt < entry.startsAt &&
+      Boolean(item.notes?.trim()),
+    )?.notes ?? null,
+  }));
 
   return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, staff, catalog, entries });
 }

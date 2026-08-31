@@ -19,6 +19,7 @@ type Entry = {
   staffId: string;
   staffName: string;
   price: string;
+  rememberedNote?: string | null;
 };
 type Data = {
   date: string;
@@ -136,6 +137,8 @@ export function AgendaCalendar({ today }: { today: string }) {
   const [open, setOpen] = useState(searchParams.get("new") === "1");
   const [showRevenue, setShowRevenue] = useState(false);
   const [failureFor, setFailureFor] = useState("");
+  const [completionFor, setCompletionFor] = useState("");
+  const [completionNote, setCompletionNote] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -194,13 +197,16 @@ export function AgendaCalendar({ today }: { today: string }) {
     setView("day");
   }
 
-  async function updateStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW") {
+  async function updateStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW", note?: string) {
     const formData = new FormData();
     formData.set("id", id);
     formData.set("status", status);
+    if (note?.trim()) formData.set("completionNote", note.trim());
     try {
       await changeAppointmentStatus(formData);
       setFailureFor("");
+      setCompletionFor("");
+      setCompletionNote("");
       await load();
     } catch {
       setError("Impossibile aggiornare l’appuntamento.");
@@ -298,6 +304,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                 <small>{entry.serviceName} · {entry.staffName}</small>
                 <small className="agenda-price">{money(Number(entry.price))}</small>
                 <em>{statusLabels[entry.status]}</em>
+                {entry.rememberedNote ? <p className="agenda-remembered-note"><strong>Nota precedente:</strong> {entry.rememberedNote}</p> : null}
                 {data.canManage || !["COMPLETED", "CANCELLED", "NO_SHOW"].includes(entry.status) ? <details className="agenda-reschedule">
                   <summary>Modifica</summary>
                   <form action={rescheduleAppointment}>
@@ -311,7 +318,12 @@ export function AgendaCalendar({ today }: { today: string }) {
                   {data.canManage ? <AppointmentPriceEditor appointmentId={entry.id} price={entry.price} onSaved={load} /> : null}
                 </details> : null}
                 {editableStatuses.includes(entry.status) ? <div className="agenda-quick-actions">
-                  <button type="button" className="agenda-complete-button" aria-label="Segna come eseguito" title="Eseguito" onClick={() => void updateStatus(entry.id, "COMPLETED")}>&#10003;</button>
+                  <button type="button" className="agenda-complete-button" aria-label="Aggiungi note e segna come eseguito" title="Aggiungi note e completa" onClick={() => { setCompletionFor(completionFor === entry.id ? "" : entry.id); setCompletionNote(entry.rememberedNote ?? ""); setFailureFor(""); }}>&#10003;</button>
+                  {completionFor === entry.id ? <div className="agenda-completion-note">
+                    <label>Note del trattamento<textarea value={completionNote} maxLength={500} placeholder="Prodotti usati, preferenze, risultato…" onChange={(event) => setCompletionNote(event.target.value)} /></label>
+                    {entry.rememberedNote ? <small>È stata precaricata la nota precedente di questo cliente per {entry.serviceName}.</small> : null}
+                    <div><button type="button" className="agenda-note-confirm" onClick={() => void updateStatus(entry.id, "COMPLETED", completionNote)}>Conferma eseguito</button><button type="button" onClick={() => { setCompletionFor(""); setCompletionNote(""); }}>Annulla</button></div>
+                  </div> : null}
                   <button type="button" className="agenda-failure-button" aria-label="Segna come non concluso" title="Non concluso" onClick={() => setFailureFor(failureFor === entry.id ? "" : entry.id)}>&#10005;</button>
                   {failureFor === entry.id ? <div className="agenda-failure-reasons">
                     <button type="button" onClick={() => void updateStatus(entry.id, "CANCELLED")}>Cancellato</button>
