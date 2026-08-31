@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { addCalendarDays, addCalendarMonths, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
 import { changeAppointmentStatus, createAppointment, rescheduleAppointment } from "./actions";
 import { CustomerAutofill } from "./customer-autofill";
+import { AppointmentPriceEditor } from "./appointment-price-editor";
 
 type Staff = { id: string; name: string };
 type Service = { staffId: string; id: string; name: string; duration: number };
@@ -285,6 +286,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                     </select></label> : null}
                     <button className="ghost-button">Salva</button>
                   </form>
+                  {data.canManage ? <AppointmentPriceEditor appointmentId={entry.id} price={entry.price} onSaved={load} /> : null}
                 </details> : null}
                 {editableStatuses.includes(entry.status) ? <div className="agenda-quick-actions">
                   <button type="button" className="agenda-complete-button" aria-label="Segna come eseguito" title="Eseguito" onClick={() => void updateStatus(entry.id, "COMPLETED")}>&#10003;</button>
