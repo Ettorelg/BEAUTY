@@ -216,7 +216,7 @@ export function AgendaCalendar({ today }: { today: string }) {
         {data.canManage ? <button type="button" onClick={() => setShowRevenue((current) => !current)}>{showRevenue ? "Nascondi incasso" : "Incasso previsto"}</button> : null}
         <button className={view === "day" ? "active" : ""} type="button" onClick={() => setView("day")}>Giorno</button>
         <button className={view === "week" ? "active" : ""} type="button" onClick={() => setView("week")}>Settimana</button>
-        {data.canManage ? <button className={view === "month" ? "active" : ""} type="button" onClick={() => setView("month")}>Mese</button> : null}
+        <button className={view === "month" ? "active" : ""} type="button" onClick={() => setView("month")}>Mese</button>
       </div>
     </div>
 

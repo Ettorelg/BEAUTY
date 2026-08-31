@@ -331,3 +331,29 @@ button { cursor: pointer; }
 .booking-final-price { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 12px; border-top: 1px solid #eaded8; }
 .booking-final-price strong { color: var(--accent); font-size: 1.35rem; }
 .agenda-price { width: max-content; margin-top: 3px; padding: 4px 7px; border-radius: 8px; background: #ede3dd; color: #5c4136 !important; font-size: .8rem; font-weight: 900; }
+/* Booking flow: disponibilità a sinistra, conferma a destra */
+.booking-layout { grid-template-columns: minmax(280px, .8fr) minmax(520px, 1.2fr); }
+.public-booking-form { grid-template-columns: minmax(260px, 1fr) minmax(250px, .85fr); align-items: start; gap: 18px; }
+.booking-times-column { min-width: 0; }
+.booking-confirmation-panel { position: sticky; top: 16px; display: grid; gap: 12px; padding: 18px; border: 1px solid #e4ddd8; border-radius: 16px; background: #faf7f5; }
+.booking-confirmation-panel h3 { margin: 0; }
+.booking-confirm-actions, .booking-guest-fields { display: grid; gap: 10px; }
+.booking-confirm-actions .primary-button, .booking-confirm-actions .ghost-button, .booking-guest-fields .primary-button, .booking-guest-fields .ghost-button { width: 100%; }
+.booking-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+.booking-filters label { display: grid; gap: 6px; font-weight: 700; }
+.booking-filters label span { font-size: .76rem; color: #756a65; }
+.booking-filters input, .booking-filters select { min-height: 46px; padding: 10px 12px; border: 1px solid #d8cec8; border-radius: 11px; background: white; }
+.booking-filter-loading { grid-column: 1 / -1; margin: 0; color: #6f5145; font-size: .82rem; font-weight: 700; }
+.salon-link-opener { display: grid; gap: 16px; margin: 24px 0 30px; }
+.salon-link-opener h2 { margin: 4px 0 8px; }
+.salon-link-controls { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; gap: 10px; }
+.salon-link-controls input { min-height: 46px; padding: 10px 12px; border: 1px solid #d8cec8; border-radius: 11px; }
+.salon-qr-video { width: min(100%, 440px); aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; background: #211b18; }
+@media (max-width: 900px) {
+  .booking-layout { grid-template-columns: 1fr; }
+  .public-booking-form { grid-template-columns: 1fr; }
+  .booking-confirmation-panel { position: static; }
+}
+@media (max-width: 700px) {
+  .booking-filters, .salon-link-controls { grid-template-columns: 1fr; }
+}

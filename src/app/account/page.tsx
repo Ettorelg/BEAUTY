@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { appointments, businesses, businessMemberships, customerRelations, fidelityCards, fidelityRedemptions, serviceCategories, services, users } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { cancelCustomerAppointment } from "./actions";
+import { SalonLinkOpener } from "./salon-link-opener";
 
 const labels: Record<string, string> = {
   BOOKED: "Prenotato",
@@ -111,6 +112,8 @@ export default async function CustomerAccountPage() {
       <section className="panel customer-profile-card"><p><strong>Nome:</strong> {session.user.name || "—"}</p><p><strong>Email:</strong> {session.user.email}</p><p><strong>Telefono:</strong> {profile?.phone || "Non inserito"}</p><Link className="ghost-button link-button" href="/account/phone?edit=1">Modifica telefono</Link></section>
     </details>
 
+    <SalonLinkOpener />
+
     <section className="list-section">
       <h2>I miei saloni</h2>
       {salons.length ? <div className="data-list">{salons.map((salon) => <article className="data-row" key={salon.slug}>
@@ -129,7 +132,7 @@ export default async function CustomerAccountPage() {
         {pendingBookings.length ? <div className="data-list">{pendingByCategory.map(([category, items]) => <section className="panel" key={category}>
           <p className="eyebrow">Categoria</p><h3>{category}</h3>
           {items.map((booking) => {
-            const cancellable = booking.startsAt > now && ["BOOKED", "CONFIRMED"].includes(booking.status);
+            const cancellable = booking.startsAt.getTime() - now.getTime() >= 60 * 60 * 1000 && ["BOOKED", "CONFIRMED"].includes(booking.status);
             return <article className="data-row customer-booking-row" key={booking.id}>
               <div><p className="eyebrow">{labels[booking.status] ?? booking.status}</p><h3>{booking.serviceName} · {booking.businessName}</h3><p className="muted">{booking.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: booking.timezone })}</p><strong>€ {Number(booking.price).toFixed(2)}</strong></div>
               <div className="customer-booking-actions">

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const requestedDate = request.nextUrl.searchParams.get("date") ?? today;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : today;
   const requestedView = request.nextUrl.searchParams.get("view");
-  const view: AgendaView = requestedView === "week" ? "week" : requestedView === "month" && isOwner ? "month" : "day";
+  const view: AgendaView = requestedView === "week" ? "week" : requestedView === "month" ? "month" : "day";
   const startDate = view === "week" ? startOfCalendarWeek(date) : view === "month" ? startOfCalendarMonth(date) : date;
   const endDate = view === "month" ? addCalendarMonths(startDate, 1) : addCalendarDays(startDate, view === "week" ? 7 : 1);
   const start = zonedLocalToUtc(`${startDate}T00:00`, context.timezone);

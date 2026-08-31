@@ -29,7 +29,7 @@ export async function cancelCustomerAppointment(formData: FormData) {
       .where(and(eq(appointments.id, id), eq(customerRelations.userId, session.user.id)))
       .limit(1);
 
-    if (!booking || !["BOOKED", "CONFIRMED"].includes(booking.status) || booking.startsAt <= new Date()) {
+    if (!booking || !["BOOKED", "CONFIRMED"].includes(booking.status) || booking.startsAt.getTime() - Date.now() < 60 * 60 * 1000) {
       throw new Error("Questo appuntamento non può più essere annullato online.");
     }
 
