@@ -330,3 +330,4 @@ button { cursor: pointer; }
 .booking-reward-picker select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #cdb9ae; border-radius: 11px; background: white; }
 .booking-final-price { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 12px; border-top: 1px solid #eaded8; }
 .booking-final-price strong { color: var(--accent); font-size: 1.35rem; }
+.agenda-price { width: max-content; margin-top: 3px; padding: 4px 7px; border-radius: 8px; background: #ede3dd; color: #5c4136 !important; font-size: .8rem; font-weight: 900; }
