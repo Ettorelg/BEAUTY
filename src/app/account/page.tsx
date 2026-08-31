@@ -36,8 +36,8 @@ export default async function CustomerAccountPage() {
   const salons = [...new Map(bookings.map((booking) => [booking.slug, { name: booking.businessName, slug: booking.slug, businessId: booking.businessId, logoKey: booking.logoKey }])).values()];
 
   return <main className="customer-account-shell">
-    <nav className="customer-top-nav"><Link className="ghost-button link-button" href="/account/salons">← Cerca saloni</Link><span>Area clienti</span><LogoutButton redirectTo="/account/login"/></nav>
-    <header className="customer-account-header"><div><p className="eyebrow">Area clienti</p><h1>Ciao, {session.user.name || "benvenuto"}.</h1><p className="muted">Prenotazioni, saloni e premi in un unico posto.</p></div><div className="button-row"><Link className="primary-button link-button" href="/account/salons">Cerca salone</Link>{professionalAccess.length ? <Link className="ghost-button link-button" href="/app">Accedi come titolare/staff</Link> : null}</div></header>
+    <nav className="customer-top-nav"><span>Area clienti</span><LogoutButton redirectTo="/account/login"/></nav>
+    <header className="customer-account-header"><div><p className="eyebrow">Area clienti</p><h1>Ciao, {session.user.name || "benvenuto"}.</h1><p className="muted">Prenotazioni, saloni e premi in un unico posto.</p></div>{professionalAccess.length ? <div className="button-row"><Link className="ghost-button link-button" href="/app">Accedi come titolare/staff</Link></div> : null}</header>
 
     <details className="customer-collapsible"><summary>I miei dati</summary><section className="panel customer-profile-card"><p><strong>Nome:</strong> {session.user.name || "—"}</p><p><strong>Email:</strong> {session.user.email}</p><p><strong>Telefono:</strong> {profile?.phone || "Non inserito"}</p><Link className="ghost-button link-button" href="/account/phone?edit=1">Modifica telefono</Link></section></details>
 

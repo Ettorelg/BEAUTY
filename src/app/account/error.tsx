@@ -16,7 +16,7 @@ export default function AccountError({ error, reset }: { error: Error & { digest
         <p>Riprova tra qualche istante. Le tue prenotazioni non sono state modificate.</p>
         <div className="button-row">
           <button className="primary-button" type="button" onClick={reset}>Riprova</button>
-          <Link className="ghost-button link-button" href="/account/salons">I miei saloni</Link>
+          <Link className="ghost-button link-button" href="/account">Torna all’area clienti</Link>
         </div>
       </section>
     </main>
