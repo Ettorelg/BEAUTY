@@ -1,6 +1,307 @@
 "use client";
-import { useRouter,useSearchParams } from "next/navigation"; import { FormEvent,useCallback,useEffect,useMemo,useState } from "react"; import { changeAppointmentStatus,createAppointment,rescheduleAppointment } from "./actions"; import { CustomerAutofill } from "./customer-autofill";
-type Staff={id:string;name:string};type Service={staffId:string;id:string;name:string;duration:number};type Entry={id:string;startsAt:string;status:string;serviceId:string;serviceName:string;customerName:string;staffId:string;staffName:string;price:string};type Data={startDate:string;timezone:string;canManage:boolean;staff:Staff[];catalog:Service[];entries:Entry[]};type Slot={staffId:string;staffName:string;localStart:string;label:string};
-const label:Record<string,string>={BOOKED:"Prenotato",CONFIRMED:"Confermato",ARRIVED:"Arrivato",COMPLETED:"Eseguito",CANCELLED:"Cancellato",NO_SHOW:"Non presentato"},moves:Record<string,string[]>={BOOKED:["COMPLETED","CANCELLED","NO_SHOW"],CONFIRMED:["COMPLETED","CANCELLED","NO_SHOW"],ARRIVED:["COMPLETED","CANCELLED","NO_SHOW"],COMPLETED:[],CANCELLED:[],NO_SHOW:[]};const add=(d:string,n:number)=>{const[a,b,c]=d.split("-").map(Number);return new Date(Date.UTC(a,b-1,c+n)).toISOString().slice(0,10)};
-function Booking({data,date,close,done}:{data:Data;date:string;close:()=>void;done:()=>void}){const[service,setService]=useState(data.catalog[0]?.id??""),[staff,setStaff]=useState(""),[day,setDay]=useState(date),[slots,setSlots]=useState<Slot[]>([]),[selected,setSelected]=useState<Slot>(),[loading,setLoading]=useState(false);const serviceRow=data.catalog.find(x=>x.id===service);const eligible=data.staff.filter(x=>data.catalog.some(s=>s.id===service&&s.staffId===x.id));useEffect(()=>{setSelected(undefined);if(!service)return;setLoading(true);fetch(`/api/agenda/availability?serviceId=${service}&date=${day}&staffId=${staff}`).then(r=>r.json()).then(x=>setSlots(x.slots??[])).finally(()=>setLoading(false))},[service,staff,day]);async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();if(!selected)return;const f=new FormData(e.currentTarget);f.set("staffId",selected.staffId);f.set("serviceId",service);f.set("startsAt",selected.localStart);const result=await createAppointment(f);if(!result.ok){alert(result.error??"Creazione appuntamento non riuscita.");return}done();close()}return <div className="booking-modal-backdrop" onMouseDown={close}><section className="booking-modal" onMouseDown={e=>e.stopPropagation()}><button className="modal-close" onClick={close}>×</button><p className="eyebrow">Nuova prenotazione</p><h2>Scegli disponibilità</h2><form className="compact-form stacked" onSubmit={submit}><label>Servizio<select value={service} onChange={e=>{setService(e.target.value);setStaff("")}}>{Array.from(new Map(data.catalog.map(x=>[x.id,x])).values()).map(x=><option value={x.id} key={x.id}>{x.name} · {x.duration} min</option>)}</select></label><label>Operatore (facoltativo)<select value={staff} onChange={e=>setStaff(e.target.value)}><option value="">Primo disponibile</option>{eligible.map(x=><option value={x.id} key={x.id}>{x.name}</option>)}</select></label><label>Data<input type="date" value={day} min={date} onChange={e=>setDay(e.target.value)}/></label><div className="slot-picker">{loading?<p className="muted">Cerco disponibilità…</p>:slots.length?slots.map(x=><button type="button" className={selected?.localStart===x.localStart&&selected?.staffId===x.staffId?"active":""} onClick={()=>setSelected(x)} key={`${x.staffId}-${x.localStart}`}>{x.label}{!staff?<small> · {x.staffName}</small>:null}</button>):<p className="muted">Nessun orario disponibile.</p>}</div>{selected?<><p className="status-pill">{selected.label} · {selected.staffName}</p><CustomerAutofill/><input type="hidden" name="idempotencyKey" value={crypto.randomUUID()}/><textarea name="notes" placeholder="Note (opzionali)"/><button className="primary-button">Conferma prenotazione</button></>:null}</form></section></div>}
-export function AgendaCalendar({today}:{today:string}){const router=useRouter(),p=useSearchParams();const[date,setDate]=useState(/^\d{4}-\d{2}-\d{2}$/.test(p.get("date")??"")?p.get("date")!:today),[view,setView]=useState(p.get("view")==="week"?"week":"day"),[data,setData]=useState<Data>(),[open,setOpen]=useState(p.get("new")==="1"),[showRevenue,setShowRevenue]=useState(false),[failureFor,setFailureFor]=useState("");const expected=useMemo(()=>{const visibleStaffIds=new Set((data?.staff??[]).map(s=>s.id));const rows=data?.entries.filter(x=>visibleStaffIds.has(x.staffId)&&!["CANCELLED","NO_SHOW"].includes(x.status))??[];const amount=(v:string)=>Number(String(v).replace(",","."))||0;return {total:rows.reduce((sum,x)=>sum+amount(x.price),0),byStaff:(data?.staff??[]).map(s=>({name:s.name,total:rows.filter(x=>x.staffId===s.id).reduce((sum,x)=>sum+amount(x.price),0)}))}},[data]);const money=(v:number)=>new Intl.NumberFormat("it-IT",{style:"currency",currency:"EUR"}).format(v);const dateLabel=new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"numeric",month:"long",year:"numeric",timeZone:"UTC"}).format(new Date(`${date}T12:00:00Z`));const load=useCallback(async()=>{const r=await fetch(`/api/agenda?date=${date}&view=${view}`,{cache:"no-store"});if(r.ok)setData(await r.json())},[date,view]);useEffect(()=>{void load()},[load]);useEffect(()=>{router.replace(`/app/agenda?date=${date}&view=${view}`,{scroll:false})},[date,view,router]);const time=(v:string)=>new Intl.DateTimeFormat("it-IT",{timeZone:data?.timezone,hour:"2-digit",minute:"2-digit"}).format(new Date(v)),hours=useMemo(()=>Array.from({length:25},(_,i)=>480+i*30),[]);if(!data)return <div className="empty-state">Caricamento agenda…</div>;return <><div className="agenda-toolbar"><div className="agenda-navigation"><button className="agenda-icon-button" onClick={()=>setDate(add(date,view==="week"?-7:-1))}>←</button><button className="ghost-button" onClick={()=>setDate(today)}>Torna a oggi</button><button className="agenda-icon-button" onClick={()=>setDate(add(date,view==="week"?7:1))}>→</button></div><h2>{dateLabel}</h2><div className="agenda-view-switch">{data.canManage?<button type="button" onClick={()=>setShowRevenue(x=>!x)}>{showRevenue?"Nascondi incasso":"Incasso previsto"}</button>:null}<button className={view==="day"?"active":""} onClick={()=>setView("day")}>Giorno</button><button className={view==="week"?"active":""} onClick={()=>setView("week")}>Settimana</button></div></div>{data.canManage&&showRevenue?<section className="agenda-revenue-card"><div><p className="eyebrow">Incasso previsto</p><strong>{money(expected.total)}</strong><p className="muted">Esclude appuntamenti cancellati e non presentati.</p></div><div className="agenda-revenue-by-staff">{expected.byStaff.map(x=><p key={x.name}><span>{x.name}</span><strong>{money(x.total)}</strong></p>)}</div></section>:null}{view==="week"?<div className="week-calendar">{Array.from({length:7},(_,i)=>add(data.startDate,i)).map(day=><section className="week-day" key={day}><header><span>{new Intl.DateTimeFormat("it-IT",{weekday:"short",timeZone:"UTC"}).format(new Date(`${day}T12:00:00Z`))}</span><strong>{day.slice(8)}</strong></header>{data.entries.filter(x=>new Intl.DateTimeFormat("en-CA",{timeZone:data.timezone}).format(new Date(x.startsAt))===day).map(x=><article className={`agenda-appointment status-${x.status.toLowerCase()}`} key={x.id}><span>{time(x.startsAt)}</span><strong>{x.customerName}</strong><small>{x.serviceName} · {x.staffName}</small><small className="agenda-price">{money(Number(x.price))}</small><em>{label[x.status]}</em></article>)}</section>)}</div>:<div className="agenda-scroll"><div className="day-calendar" style={{gridTemplateColumns:`76px repeat(${Math.max(data.staff.length,1)}, minmax(190px,1fr))`}}><div className="calendar-corner">Ora</div>{data.staff.map(s=><div className="staff-heading" key={s.id}>{s.name}</div>)}{hours.map(m=>{const t=`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;return <div className="calendar-row" key={m} style={{gridColumn:"1 / -1",gridTemplateColumns:`76px repeat(${Math.max(data.staff.length,1)}, minmax(190px,1fr))`}}><time>{t}</time>{data.staff.map(s=><div className="calendar-cell" key={s.id}>{data.entries.filter(x=>x.staffId===s.id&&time(x.startsAt)===t).map(x=><article className={`agenda-appointment status-${x.status.toLowerCase()}`} key={x.id}><span>{t}</span><strong>{x.customerName}</strong><small>{x.serviceName} · {x.staffName}</small><small className="agenda-price">{money(Number(x.price))}</small><em>{label[x.status]}</em>{data.canManage||!["COMPLETED","CANCELLED","NO_SHOW"].includes(x.status)?<details className="agenda-reschedule"><summary>Modifica</summary><form action={rescheduleAppointment}><input type="hidden" name="id" value={x.id}/><input name="startsAt" type="datetime-local" required/>{data.canManage?<label>Operatore<select name="staffId" defaultValue={x.staffId}>{data.staff.filter(s=>data.catalog.some(c=>c.id===x.serviceId&&c.staffId===s.id)).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>:null}<button className="ghost-button">Salva</button></form></details>:null}{["BOOKED","CONFIRMED","ARRIVED"].includes(x.status)?<div className="agenda-quick-actions"><button type="button" className="agenda-complete-button" aria-label="Segna come eseguito" title="Eseguito" onClick={()=>{const f=new FormData();f.set("id",x.id);f.set("status","COMPLETED");void changeAppointmentStatus(f).then(load).catch(()=>alert("Impossibile aggiornare l appuntamento."))}}>&#10003;</button><button type="button" className="agenda-failure-button" aria-label="Segna come non concluso" title="Non concluso" onClick={()=>setFailureFor(failureFor===x.id?"":x.id)}>&#10005;</button>{failureFor===x.id?<div className="agenda-failure-reasons"><button type="button" onClick={()=>{const f=new FormData();f.set("id",x.id);f.set("status","CANCELLED");void changeAppointmentStatus(f).then(()=>{setFailureFor("");load()}).catch(()=>alert("Impossibile aggiornare l appuntamento."))}}>Cancellato</button><button type="button" onClick={()=>{const f=new FormData();f.set("id",x.id);f.set("status","NO_SHOW");void changeAppointmentStatus(f).then(()=>{setFailureFor("");load()}).catch(()=>alert("Impossibile aggiornare l appuntamento."))}}>Non presentato</button></div>:null}</div>:null}</article>)}</div>)}</div>})}</div></div>}{data.canManage?<button className="new-booking-fab" onClick={()=>setOpen(true)}><span>＋</span> Nuova prenotazione</button>:null}{open?<Booking data={data} date={date} close={()=>setOpen(false)} done={load}/>:null}</>}
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { addCalendarDays, addCalendarMonths, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
+import { changeAppointmentStatus, createAppointment, rescheduleAppointment } from "./actions";
+import { CustomerAutofill } from "./customer-autofill";
+
+type Staff = { id: string; name: string };
+type Service = { staffId: string; id: string; name: string; duration: number };
+type Entry = {
+  id: string;
+  startsAt: string;
+  status: string;
+  serviceId: string;
+  serviceName: string;
+  customerName: string;
+  staffId: string;
+  staffName: string;
+  price: string;
+};
+type Data = {
+  date: string;
+  startDate: string;
+  view: AgendaView;
+  timezone: string;
+  canManage: boolean;
+  staff: Staff[];
+  catalog: Service[];
+  entries: Entry[];
+};
+type Slot = { staffId: string; staffName: string; localStart: string; label: string };
+
+const statusLabels: Record<string, string> = {
+  BOOKED: "Prenotato",
+  CONFIRMED: "Confermato",
+  ARRIVED: "Arrivato",
+  COMPLETED: "Eseguito",
+  CANCELLED: "Cancellato",
+  NO_SHOW: "Non presentato",
+};
+const editableStatuses = ["BOOKED", "CONFIRMED", "ARRIVED"];
+const weekDays = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+
+function Booking({ data, date, close, done }: { data: Data; date: string; close: () => void; done: () => void }) {
+  const [service, setService] = useState(data.catalog[0]?.id ?? "");
+  const [staff, setStaff] = useState("");
+  const [day, setDay] = useState(date);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [selected, setSelected] = useState<Slot>();
+  const [loading, setLoading] = useState(false);
+  const eligible = data.staff.filter((member) => data.catalog.some((item) => item.id === service && item.staffId === member.id));
+
+  useEffect(() => {
+    setSelected(undefined);
+    if (!service) return;
+    setLoading(true);
+    fetch(`/api/agenda/availability?serviceId=${service}&date=${day}&staffId=${staff}`)
+      .then((response) => response.json())
+      .then((payload) => setSlots(payload.slots ?? []))
+      .finally(() => setLoading(false));
+  }, [service, staff, day]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected) return;
+    const formData = new FormData(event.currentTarget);
+    formData.set("staffId", selected.staffId);
+    formData.set("serviceId", service);
+    formData.set("startsAt", selected.localStart);
+    const result = await createAppointment(formData);
+    if (!result.ok) {
+      alert(result.error ?? "Creazione appuntamento non riuscita.");
+      return;
+    }
+    done();
+    close();
+  }
+
+  return (
+    <div className="booking-modal-backdrop" onMouseDown={close}>
+      <section className="booking-modal" onMouseDown={(event) => event.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={close}>×</button>
+        <p className="eyebrow">Nuova prenotazione</p>
+        <h2>Scegli disponibilità</h2>
+        <form className="compact-form stacked" onSubmit={submit}>
+          <label>
+            Servizio
+            <select value={service} onChange={(event) => { setService(event.target.value); setStaff(""); }}>
+              {Array.from(new Map(data.catalog.map((item) => [item.id, item])).values()).map((item) => (
+                <option value={item.id} key={item.id}>{item.name} · {item.duration} min</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Operatore (facoltativo)
+            <select value={staff} onChange={(event) => setStaff(event.target.value)}>
+              <option value="">Primo disponibile</option>
+              {eligible.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}
+            </select>
+          </label>
+          <label>Data<input type="date" value={day} min={date} onChange={(event) => setDay(event.target.value)} /></label>
+          <div className="slot-picker">
+            {loading ? <p className="muted">Cerco disponibilità…</p> : slots.length ? slots.map((slot) => (
+              <button
+                type="button"
+                className={selected?.localStart === slot.localStart && selected?.staffId === slot.staffId ? "active" : ""}
+                onClick={() => setSelected(slot)}
+                key={`${slot.staffId}-${slot.localStart}`}
+              >
+                {slot.label}{!staff ? <small> · {slot.staffName}</small> : null}
+              </button>
+            )) : <p className="muted">Nessun orario disponibile.</p>}
+          </div>
+          {selected ? <>
+            <p className="status-pill">{selected.label} · {selected.staffName}</p>
+            <CustomerAutofill />
+            <input type="hidden" name="idempotencyKey" value={crypto.randomUUID()} />
+            <textarea name="notes" placeholder="Note (opzionali)" />
+            <button className="primary-button">Conferma prenotazione</button>
+          </> : null}
+        </form>
+      </section>
+    </div>
+  );
+}
+
+export function AgendaCalendar({ today }: { today: string }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedView = searchParams.get("view");
+  const [date, setDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("date") ?? "") ? searchParams.get("date")! : today);
+  const [view, setView] = useState<AgendaView>(requestedView === "week" || requestedView === "month" ? requestedView : "day");
+  const [data, setData] = useState<Data>();
+  const [open, setOpen] = useState(searchParams.get("new") === "1");
+  const [showRevenue, setShowRevenue] = useState(false);
+  const [failureFor, setFailureFor] = useState("");
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/agenda?date=${date}&view=${view}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("Impossibile caricare l’agenda.");
+      const payload = await response.json() as Data;
+      setData(payload);
+      setError("");
+      if (payload.view !== view) setView(payload.view);
+    } catch {
+      setError("Impossibile caricare l’agenda. Riprova.");
+    }
+  }, [date, view]);
+
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { router.replace(`/app/agenda?date=${date}&view=${view}`, { scroll: false }); }, [date, view, router]);
+
+  const money = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value);
+  const time = (value: string) => new Intl.DateTimeFormat("it-IT", { timeZone: data?.timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  const dayForEntry = (entry: Entry) => new Intl.DateTimeFormat("en-CA", { timeZone: data?.timezone }).format(new Date(entry.startsAt));
+  const hours = useMemo(() => Array.from({ length: 25 }, (_, index) => 480 + index * 30), []);
+  const expected = useMemo(() => {
+    const visibleStaffIds = new Set((data?.staff ?? []).map((member) => member.id));
+    const rows = data?.entries.filter((entry) => visibleStaffIds.has(entry.staffId) && !["CANCELLED", "NO_SHOW"].includes(entry.status)) ?? [];
+    const amount = (value: string) => Number(String(value).replace(",", ".")) || 0;
+    return {
+      total: rows.reduce((sum, entry) => sum + amount(entry.price), 0),
+      byStaff: (data?.staff ?? []).map((member) => ({
+        name: member.name,
+        total: rows.filter((entry) => entry.staffId === member.id).reduce((sum, entry) => sum + amount(entry.price), 0),
+      })),
+    };
+  }, [data]);
+
+  if (!data) return <div className="empty-state">Caricamento agenda…</div>;
+
+  const dateLabel = data.view === "month"
+    ? new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${data.startDate}T12:00:00Z`))
+    : new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+
+  function movePeriod(direction: -1 | 1) {
+    if (view === "month") setDate(addCalendarMonths(date, direction));
+    else setDate(addCalendarDays(date, direction * (view === "week" ? 7 : 1)));
+  }
+
+  function openDay(day: string) {
+    setDate(day);
+    setView("day");
+  }
+
+  async function updateStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW") {
+    const formData = new FormData();
+    formData.set("id", id);
+    formData.set("status", status);
+    try {
+      await changeAppointmentStatus(formData);
+      setFailureFor("");
+      await load();
+    } catch {
+      setError("Impossibile aggiornare l’appuntamento.");
+    }
+  }
+
+  return <>
+    <div className="agenda-toolbar">
+      <div className="agenda-navigation">
+        <button className="agenda-icon-button" type="button" aria-label="Periodo precedente" onClick={() => movePeriod(-1)}>←</button>
+        <button className="ghost-button" type="button" onClick={() => setDate(today)}>Torna a oggi</button>
+        <button className="agenda-icon-button" type="button" aria-label="Periodo successivo" onClick={() => movePeriod(1)}>→</button>
+      </div>
+      <h2>{dateLabel}</h2>
+      <div className="agenda-view-switch">
+        {data.canManage ? <button type="button" onClick={() => setShowRevenue((current) => !current)}>{showRevenue ? "Nascondi incasso" : "Incasso previsto"}</button> : null}
+        <button className={view === "day" ? "active" : ""} type="button" onClick={() => setView("day")}>Giorno</button>
+        <button className={view === "week" ? "active" : ""} type="button" onClick={() => setView("week")}>Settimana</button>
+        {data.canManage ? <button className={view === "month" ? "active" : ""} type="button" onClick={() => setView("month")}>Mese</button> : null}
+      </div>
+    </div>
+
+    {error ? <p className="agenda-error" role="alert">{error}</p> : null}
+
+    {data.canManage && showRevenue ? <section className="agenda-revenue-card">
+      <div>
+        <p className="eyebrow">Incasso previsto</p>
+        <strong>{money(expected.total)}</strong>
+        <p className="muted">Esclude appuntamenti cancellati e non presentati.</p>
+      </div>
+      <div className="agenda-revenue-by-staff">
+        {expected.byStaff.map((item) => <p key={item.name}><span>{item.name}</span><strong>{money(item.total)}</strong></p>)}
+      </div>
+    </section> : null}
+
+    {data.view === "month" ? <div className="month-calendar">
+      {weekDays.map((weekDay) => <div className="month-weekday" key={weekDay}>{weekDay}</div>)}
+      {monthGridDates(data.startDate).map((day, index) => {
+        if (!day) return <div className="month-day month-day-empty" aria-hidden="true" key={`empty-${index}`} />;
+        const entries = data.entries.filter((entry) => dayForEntry(entry) === day);
+        return <button
+          className={`month-day${day === today ? " today" : ""}`}
+          type="button"
+          key={day}
+          onClick={() => openDay(day)}
+          aria-label={`${day}: ${entries.length} appuntamenti. Apri la giornata.`}
+        >
+          <span className="month-day-number">{Number(day.slice(8))}</span>
+          <span className="month-day-count">{entries.length ? `${entries.length} appuntament${entries.length === 1 ? "o" : "i"}` : "Nessun appuntamento"}</span>
+          <span className="month-day-entries">
+            {entries.slice(0, 3).map((entry) => <span className={`month-entry status-${entry.status.toLowerCase()}`} key={entry.id}>
+              <strong>{time(entry.startsAt)}</strong> {entry.customerName}<small>{entry.staffName}</small>
+            </span>)}
+            {entries.length > 3 ? <span className="month-more">+ {entries.length - 3} altri</span> : null}
+          </span>
+        </button>;
+      })}
+    </div> : data.view === "week" ? <div className="week-calendar">
+      {Array.from({ length: 7 }, (_, index) => addCalendarDays(data.startDate, index)).map((day) => <section className={`week-day${day === today ? " today" : ""}`} key={day}>
+        <header>
+          <span>{new Intl.DateTimeFormat("it-IT", { weekday: "short", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`))}</span>
+          <strong>{day.slice(8)}</strong>
+        </header>
+        {data.entries.filter((entry) => dayForEntry(entry) === day).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id}>
+          <span>{time(entry.startsAt)}</span><strong>{entry.customerName}</strong><small>{entry.serviceName} · {entry.staffName}</small><small className="agenda-price">{money(Number(entry.price))}</small><em>{statusLabels[entry.status]}</em>
+        </article>)}
+      </section>)}
+    </div> : <div className="agenda-scroll">
+      <div className="day-calendar" style={{ gridTemplateColumns: `76px repeat(${Math.max(data.staff.length, 1)}, minmax(190px,1fr))` }}>
+        <div className="calendar-corner">Ora</div>
+        {data.staff.map((member) => <div className="staff-heading" key={member.id}>{member.name}</div>)}
+        {hours.map((minutes) => {
+          const slotTime = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+          return <div className="calendar-row" key={minutes} style={{ gridColumn: "1 / -1", gridTemplateColumns: `76px repeat(${Math.max(data.staff.length, 1)}, minmax(190px,1fr))` }}>
+            <time>{slotTime}</time>
+            {data.staff.map((member) => <div className="calendar-cell" key={member.id}>
+              {data.entries.filter((entry) => entry.staffId === member.id && time(entry.startsAt) === slotTime).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id}>
+                <span>{slotTime}</span>
+                <strong>{entry.customerName}</strong>
+                <small>{entry.serviceName} · {entry.staffName}</small>
+                <small className="agenda-price">{money(Number(entry.price))}</small>
+                <em>{statusLabels[entry.status]}</em>
+                {data.canManage || !["COMPLETED", "CANCELLED", "NO_SHOW"].includes(entry.status) ? <details className="agenda-reschedule">
+                  <summary>Modifica</summary>
+                  <form action={rescheduleAppointment}>
+                    <input type="hidden" name="id" value={entry.id} />
+                    <input name="startsAt" type="datetime-local" required />
+                    {data.canManage ? <label>Operatore<select name="staffId" defaultValue={entry.staffId}>
+                      {data.staff.filter((memberOption) => data.catalog.some((catalogItem) => catalogItem.id === entry.serviceId && catalogItem.staffId === memberOption.id)).map((memberOption) => <option key={memberOption.id} value={memberOption.id}>{memberOption.name}</option>)}
+                    </select></label> : null}
+                    <button className="ghost-button">Salva</button>
+                  </form>
+                </details> : null}
+                {editableStatuses.includes(entry.status) ? <div className="agenda-quick-actions">
+                  <button type="button" className="agenda-complete-button" aria-label="Segna come eseguito" title="Eseguito" onClick={() => void updateStatus(entry.id, "COMPLETED")}>&#10003;</button>
+                  <button type="button" className="agenda-failure-button" aria-label="Segna come non concluso" title="Non concluso" onClick={() => setFailureFor(failureFor === entry.id ? "" : entry.id)}>&#10005;</button>
+                  {failureFor === entry.id ? <div className="agenda-failure-reasons">
+                    <button type="button" onClick={() => void updateStatus(entry.id, "CANCELLED")}>Cancellato</button>
+                    <button type="button" onClick={() => void updateStatus(entry.id, "NO_SHOW")}>Non presentato</button>
+                  </div> : null}
+                </div> : null}
+              </article>)}
+            </div>)}
+          </div>;
+        })}
+      </div>
+    </div>}
+
+    {data.canManage ? <button className="new-booking-fab" type="button" onClick={() => setOpen(true)}><span>＋</span> Nuova prenotazione</button> : null}
+    {open ? <Booking data={data} date={date} close={() => setOpen(false)} done={load} /> : null}
+  </>;
+}
