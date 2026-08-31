@@ -14,7 +14,7 @@
 .calendar-row { display: grid; min-height: 64px; }
 .calendar-row time { position: sticky; left: 0; z-index: 2; padding: 10px 12px; border-right: 1px solid #eee7e3; border-bottom: 1px solid #eee7e3; background: #faf8f6; color: #756a65; font-size: .78rem; }
 .calendar-cell { min-width: 0; padding: 5px; border-right: 1px solid #eee7e3; border-bottom: 1px solid #eee7e3; }
-.agenda-appointment { display: grid; gap: 3px; margin-bottom: 5px; padding: 9px; border-left: 4px solid #806052; border-radius: 9px; background: #efe5df; }
+.agenda-appointment { position: relative; display: grid; gap: 3px; margin-bottom: 5px; padding: 9px 84px 9px 9px; border-left: 4px solid #806052; border-radius: 9px; background: #efe5df; }
 .agenda-appointment > span, .agenda-appointment > em { color: #6f5145; font-size: .7rem; font-style: normal; font-weight: 800; text-transform: uppercase; }
 .agenda-appointment small { color: #665b55; }
 .agenda-appointment select { width: 100%; margin-top: 4px; border: 1px solid #d8cec8; border-radius: 7px; padding: 4px; background: white; font-size: .74rem; }
@@ -61,11 +61,11 @@
 .agenda-revenue-by-staff strong { font-size: 1rem; color: #312723; }
 .agenda-complete-button { width: 100%; margin-top: 5px; border: 0; border-radius: 7px; padding: 7px 9px; background: #39784b; color: white; font-weight: 800; font-size: .76rem; }
 .agenda-complete-button:hover { background: #2d663d; }
-.agenda-quick-actions { position: relative; display: flex; gap: 6px; margin-top: 6px; }
-.agenda-complete-button, .agenda-failure-button { width: 34px !important; margin: 0 !important; padding: 6px !important; font-size: 1rem !important; line-height: 1; }
+.agenda-quick-actions { position: absolute; z-index: 6; top: 8px; right: 8px; display: flex; gap: 6px; margin: 0; }
+.agenda-complete-button, .agenda-failure-button { width: 34px !important; min-height: 34px !important; margin: 0 !important; padding: 6px !important; font-size: 1rem !important; line-height: 1; }
 .agenda-failure-button { border: 0; border-radius: 7px; background: #8e5953; color: white; font-weight: 800; }
 .agenda-failure-button:hover { background: #743f3a; }
-.agenda-failure-reasons { position: absolute; z-index: 8; right: 0; top: 40px; display: flex; gap: 5px; padding: 7px; border: 1px solid #ded4cf; border-radius: 9px; background: white; box-shadow: 0 8px 18px #2b211c2b; }
+.agenda-failure-reasons { position: absolute; z-index: 8; right: 0; top: 38px; display: flex; gap: 5px; padding: 7px; border: 1px solid #ded4cf; border-radius: 9px; background: white; box-shadow: 0 8px 18px #2b211c2b; }
 .agenda-failure-reasons button { border: 0; border-radius: 6px; padding: 6px 8px; background: #f2ece8; color: #5d4037; font-size: .72rem; font-weight: 800; white-space: nowrap; }
 .agenda-price { width: max-content; margin-top: 3px; padding: 4px 7px; border-radius: 8px; background: #ede3dd; color: #5c4136 !important; font-size: .8rem; font-weight: 900; }
 
@@ -82,7 +82,7 @@
   .calendar-row { min-height: 46px; }
   .calendar-row time { padding: 7px 6px; font-size: .7rem; }
   .calendar-cell { padding: 3px; }
-  .agenda-appointment { padding: 7px; font-size: .78rem; }
+  .agenda-appointment { padding: 7px 82px 7px 7px; font-size: .78rem; }
   .agenda-appointment small { font-size: .68rem; }
   .agenda-appointment .agenda-reschedule { display: block; }
   .agenda-revenue-card { align-items: stretch; flex-direction: column; gap: 12px; }
