@@ -9,6 +9,9 @@
 * { box-sizing: border-box; }
 
 body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   margin: 0;
   background: var(--background);
   color: var(--foreground);
@@ -356,4 +359,17 @@ button { cursor: pointer; }
 }
 @media (max-width: 700px) {
   .booking-filters, .salon-link-controls { grid-template-columns: 1fr; }
+}
+.site-footer { margin-top: auto; border-top: 1px solid #ded5d0; background: #2b211d; color: #eadfda; }
+.site-footer-inner { width: min(1180px, calc(100% - 32px)); display: grid; grid-template-columns: auto auto; align-items: center; gap: 8px 28px; margin: 0 auto; padding: 20px 0; }
+.site-footer p { margin: 0; line-height: 1.45; }
+.site-footer-developer { font-size: .88rem; font-weight: 700; }
+.site-footer a { color: #fff7f2; font-weight: 800; text-underline-offset: 3px; }
+.site-footer nav { display: flex; justify-content: flex-end; gap: 18px; font-size: .82rem; }
+.site-footer-legal { grid-column: 1 / -1; color: #cdbeb7; font-size: .7rem; }
+.site-footer-legal a { color: inherit; font-weight: 700; }
+@media (max-width: 700px) {
+  .site-footer-inner { grid-template-columns: 1fr; padding: 18px 0; }
+  .site-footer nav { justify-content: flex-start; flex-wrap: wrap; gap: 12px 18px; }
+  .site-footer-legal { grid-column: 1; }
 }
