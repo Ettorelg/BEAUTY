@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addCalendarMonths, monthGridDates, startOfCalendarWeek } from "./calendar";
+import { addCalendarMonths, addCalendarYears, monthGridDates, startOfCalendarWeek, startOfCalendarYear } from "./calendar";
 
 describe("agenda calendar", () => {
   it("starts weeks on Monday", () => {
@@ -10,6 +10,12 @@ describe("agenda calendar", () => {
   it("moves between months without overflowing short months", () => {
     expect(addCalendarMonths("2026-01-31", 1)).toBe("2026-02-01");
     expect(addCalendarMonths("2026-03-31", -1)).toBe("2026-02-01");
+  });
+
+  it("moves between complete calendar years", () => {
+    expect(startOfCalendarYear("2026-08-31")).toBe("2026-01-01");
+    expect(addCalendarYears("2026-08-31", 1)).toBe("2027-01-01");
+    expect(addCalendarYears("2026-08-31", -1)).toBe("2025-01-01");
   });
 
   it("builds a Monday-first grid containing every day of the month", () => {

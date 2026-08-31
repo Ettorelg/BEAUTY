@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { addCalendarDays, addCalendarMonths, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
+import { addCalendarDays, addCalendarMonths, addCalendarYears, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
 import { changeAppointmentStatus, createAppointment, rescheduleAppointment } from "./actions";
 import { CustomerAutofill } from "./customer-autofill";
 import { AppointmentPriceEditor } from "./appointment-price-editor";
@@ -131,7 +131,7 @@ export function AgendaCalendar({ today }: { today: string }) {
   const searchParams = useSearchParams();
   const requestedView = searchParams.get("view");
   const [date, setDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("date") ?? "") ? searchParams.get("date")! : today);
-  const [view, setView] = useState<AgendaView>(requestedView === "week" || requestedView === "month" ? requestedView : "day");
+  const [view, setView] = useState<AgendaView>(requestedView === "week" || requestedView === "month" || requestedView === "year" ? requestedView : "day");
   const [data, setData] = useState<Data>();
   const [open, setOpen] = useState(searchParams.get("new") === "1");
   const [showRevenue, setShowRevenue] = useState(false);
@@ -172,9 +172,11 @@ export function AgendaCalendar({ today }: { today: string }) {
 
   if (!data) return <div className="empty-state">Caricamento agenda…</div>;
 
-  const dateLabel = data.view === "month"
-    ? new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${data.startDate}T12:00:00Z`))
-    : new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+  const dateLabel = data.view === "year"
+    ? data.startDate.slice(0, 4)
+    : data.view === "month"
+      ? new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${data.startDate}T12:00:00Z`))
+      : new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
   const dayTimes = Array.from(new Set(
     data.entries
       .filter((entry) => dayForEntry(entry) === date)
@@ -182,7 +184,8 @@ export function AgendaCalendar({ today }: { today: string }) {
   )).sort((left, right) => left.localeCompare(right));
 
   function movePeriod(direction: -1 | 1) {
-    if (view === "month") setDate(addCalendarMonths(date, direction));
+    if (view === "year") setDate(addCalendarYears(date, direction));
+    else if (view === "month") setDate(addCalendarMonths(date, direction));
     else setDate(addCalendarDays(date, direction * (view === "week" ? 7 : 1)));
   }
 
@@ -217,6 +220,7 @@ export function AgendaCalendar({ today }: { today: string }) {
         <button className={view === "day" ? "active" : ""} type="button" onClick={() => setView("day")}>Giorno</button>
         <button className={view === "week" ? "active" : ""} type="button" onClick={() => setView("week")}>Settimana</button>
         <button className={view === "month" ? "active" : ""} type="button" onClick={() => setView("month")}>Mese</button>
+        {data.canManage ? <button className={view === "year" ? "active" : ""} type="button" onClick={() => setView("year")}>Anno</button> : null}
       </div>
     </div>
 
@@ -233,7 +237,21 @@ export function AgendaCalendar({ today }: { today: string }) {
       </div>
     </section> : null}
 
-    {data.view === "month" ? <div className="month-calendar">
+    {data.view === "year" ? <div className="year-calendar">
+      {Array.from({ length: 12 }, (_, index) => {
+        const monthStart = `${data.startDate.slice(0, 4)}-${String(index + 1).padStart(2, "0")}-01`;
+        const monthKey = monthStart.slice(0, 7);
+        const monthEntries = data.entries.filter((entry) => dayForEntry(entry).startsWith(monthKey));
+        const activeEntries = monthEntries.filter((entry) => !["CANCELLED", "NO_SHOW"].includes(entry.status));
+        const total = activeEntries.reduce((sum, entry) => sum + (Number(entry.price) || 0), 0);
+        return <button className="year-month" type="button" key={monthStart} onClick={() => { setDate(monthStart); setView("month"); }}>
+          <span>{new Intl.DateTimeFormat("it-IT", { month: "long", timeZone: "UTC" }).format(new Date(`${monthStart}T12:00:00Z`))}</span>
+          <strong>{monthEntries.length}</strong>
+          <small>appuntament{monthEntries.length === 1 ? "o" : "i"}</small>
+          <em>{money(total)}</em>
+        </button>;
+      })}
+    </div> : data.view === "month" ? <div className="month-calendar">
       {weekDays.map((weekDay) => <div className="month-weekday" key={weekDay}>{weekDay}</div>)}
       {monthGridDates(data.startDate).map((day, index) => {
         if (!day) return <div className="month-day month-day-empty" aria-hidden="true" key={`empty-${index}`} />;

@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import { appointments, customerRelations, services, staffInvitations, staffMembers, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
-import { addCalendarDays, addCalendarMonths, startOfCalendarMonth, startOfCalendarWeek, type AgendaView } from "@/modules/agenda/domain/calendar";
+import { addCalendarDays, addCalendarMonths, addCalendarYears, startOfCalendarMonth, startOfCalendarWeek, startOfCalendarYear, type AgendaView } from "@/modules/agenda/domain/calendar";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 
 export async function GET(request: NextRequest) {
@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
   const requestedDate = request.nextUrl.searchParams.get("date") ?? today;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : today;
   const requestedView = request.nextUrl.searchParams.get("view");
-  const view: AgendaView = requestedView === "week" ? "week" : requestedView === "month" ? "month" : "day";
-  const startDate = view === "week" ? startOfCalendarWeek(date) : view === "month" ? startOfCalendarMonth(date) : date;
-  const endDate = view === "month" ? addCalendarMonths(startDate, 1) : addCalendarDays(startDate, view === "week" ? 7 : 1);
+  const view: AgendaView = requestedView === "week" ? "week" : requestedView === "month" ? "month" : requestedView === "year" && isOwner ? "year" : "day";
+  const startDate = view === "week" ? startOfCalendarWeek(date) : view === "month" ? startOfCalendarMonth(date) : view === "year" ? startOfCalendarYear(date) : date;
+  const endDate = view === "year" ? addCalendarYears(startDate, 1) : view === "month" ? addCalendarMonths(startDate, 1) : addCalendarDays(startDate, view === "week" ? 7 : 1);
   const start = zonedLocalToUtc(`${startDate}T00:00`, context.timezone);
   const end = zonedLocalToUtc(`${endDate}T00:00`, context.timezone);
 

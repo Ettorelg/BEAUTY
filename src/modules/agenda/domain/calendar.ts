@@ -1,4 +1,4 @@
-export type AgendaView = "day" | "week" | "month";
+export type AgendaView = "day" | "week" | "month" | "year";
 
 export function addCalendarDays(date: string, days: number) {
   const [year, month, day] = date.split("-").map(Number);
@@ -10,6 +10,10 @@ export function startOfCalendarWeek(date: string) {
   return addCalendarDays(date, -(weekday || 7) + 1);
 }
 
+export function startOfCalendarYear(date: string) {
+  return `${date.slice(0, 4)}-01-01`;
+}
+
 export function startOfCalendarMonth(date: string) {
   return `${date.slice(0, 8)}01`;
 }
@@ -17,6 +21,11 @@ export function startOfCalendarMonth(date: string) {
 export function addCalendarMonths(date: string, months: number) {
   const [year, month] = date.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1 + months, 1)).toISOString().slice(0, 10);
+}
+
+export function addCalendarYears(date: string, years: number) {
+  const year = Number(date.slice(0, 4));
+  return `${year + years}-01-01`;
 }
 
 export function monthGridDates(date: string) {

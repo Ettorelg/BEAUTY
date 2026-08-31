@@ -33,6 +33,14 @@
 .week-day header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 5px; text-transform: capitalize; }
 .week-day header strong { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: #f0e8e4; color: var(--accent); font-size: .75rem; }
 
+.year-calendar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.year-month { min-width: 0; display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 3px 8px; padding: 14px; border: 1px solid #e4ddd8; border-radius: 13px; background: white; color: #302824; font: inherit; text-align: left; cursor: pointer; }
+.year-month:hover { border-color: #b99d8e; background: #fffaf7; }
+.year-month > span { grid-column: 1 / -1; color: #6f5145; font-size: .78rem; font-weight: 900; text-transform: capitalize; }
+.year-month > strong { font-size: 1.7rem; line-height: 1; }
+.year-month > small { color: #756a65; font-size: .7rem; }
+.year-month > em { grid-column: 1 / -1; color: #39784b; font-size: .82rem; font-style: normal; font-weight: 900; }
+
 .month-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: hidden; border: 1px solid #ded5d0; border-radius: 18px; background: #ded5d0; gap: 1px; }
 .month-weekday { padding: 11px 8px; background: #f3eeeb; color: #6d625c; font-size: .78rem; font-weight: 900; text-align: center; text-transform: uppercase; }
 .month-day { min-width: 0; min-height: 150px; display: flex; flex-direction: column; gap: 7px; border: 0; padding: 10px; background: white; color: #302824; font: inherit; text-align: left; cursor: pointer; transition: background .16s ease, box-shadow .16s ease; }
@@ -98,6 +106,10 @@
   .agenda-revenue-card { align-items: stretch; flex-direction: column; gap: 12px; }
   .agenda-revenue-by-staff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .agenda-revenue-by-staff p { min-width: 0; }
+  .year-calendar { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .year-month { padding: 9px 7px; }
+  .year-month > strong { font-size: 1.25rem; }
+  .year-month > em { font-size: .68rem; }
   .month-weekday { padding: 8px 1px; font-size: .62rem; }
   .month-day { min-height: 68px; gap: 3px; padding: 5px 3px; }
   .month-day-number { width: 25px; height: 25px; font-size: .75rem; }
