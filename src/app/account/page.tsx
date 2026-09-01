@@ -137,7 +137,7 @@ export default async function CustomerAccountPage() {
               <div><p className="eyebrow">{labels[booking.status] ?? booking.status}</p><h3>{booking.serviceName} · {booking.businessName}</h3><p className="muted">{booking.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: booking.timezone })}</p><strong>€ {Number(booking.price).toFixed(2)}</strong></div>
               <div className="customer-booking-actions">
                 {booking.startsAt > now ? <a className="ghost-button link-button" href={googleCalendarUrl(booking)} target="_blank" rel="noreferrer">Aggiungi al calendario</a> : null}
-                {cancellable ? <form action={cancelCustomerAppointment}><input type="hidden" name="id" value={booking.id} /><button className="danger-button">Annulla</button></form> : null}
+                {cancellable ? <><Link className="ghost-button link-button" href={`/account/appointments/${booking.id}`}>Modifica</Link><form action={cancelCustomerAppointment}><input type="hidden" name="id" value={booking.id} /><button className="danger-button">Annulla</button></form></> : null}
               </div>
             </article>;
           })}
