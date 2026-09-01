@@ -14,8 +14,8 @@ export default function HomePage() {
         </div>
         <p>Prenotazioni, agenda, clienti e Fidelity in un unico spazio pensato per il settore beauty.</p>
         <div className="button-row">
-          <Link className="primary-button link-button" href="/register">Inizia ora</Link>
-          <Link className="ghost-button link-button" href="/login">Accedi</Link>
+          <Link className="primary-button link-button" href="/account/login">Accesso clienti</Link>
+          <Link className="ghost-button link-button" href="/login">Accesso professionisti</Link>
         </div>
         <nav className="button-row" aria-label="Informazioni legali" style={{ marginTop: 24 }}>
           <Link href="/privacy">Privacy</Link>
