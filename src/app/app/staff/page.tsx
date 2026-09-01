@@ -13,6 +13,16 @@ const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
 
 export default async function StaffPage() {
   const context = await requireBusinessContext();
+  if (context.role === "STAFF") {
+    const [ownProfile] = await db.select({ id: staffMembers.id, name: staffMembers.name }).from(staffMembers)
+      .where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.userId, context.user.id), eq(staffMembers.active, true))).limit(1);
+    const ownAbsences = ownProfile ? await db.select().from(staffAbsences)
+      .where(and(eq(staffAbsences.businessId, context.businessId), eq(staffAbsences.staffId, ownProfile.id))).orderBy(asc(staffAbsences.startsAt)) : [];
+    return <main className="dashboard-shell"><AppNav businessName={context.businessName} role={context.role} staffAccess/>
+      <div className="page-heading"><div><p className="eyebrow">Disponibilità personale</p><h1>Le mie assenze</h1></div><p className="muted">Registra una fascia in cui non sarai disponibile per le prenotazioni.</p></div>
+      {ownProfile ? <section className="management-grid"><article className="panel"><h2>Registra assenza</h2><p className="muted">Operatore: <strong>{ownProfile.name}</strong></p><form action={addAbsence} className="compact-form stacked"><div className="form-row"><label>Da<input name="startsAt" type="datetime-local" required/></label><label>A<input name="endsAt" type="datetime-local" required/></label></div><input name="reason" placeholder="Motivo (opzionale)"/><button className="primary-button">Registra la mia assenza</button></form></article><article className="panel"><h2>Assenze registrate</h2>{ownAbsences.length ? <div className="data-list">{ownAbsences.map(absence => <div className="data-row" key={absence.id}><div><strong>{absence.startsAt.toLocaleString("it-IT", { timeZone: context.timezone })}</strong><p className="muted">fino al {absence.endsAt.toLocaleString("it-IT", { timeZone: context.timezone })}</p>{absence.reason ? <p>{absence.reason}</p> : null}</div></div>)}</div> : <p className="muted">Nessuna assenza registrata.</p>}</article></section> : <div className="empty-state">Il tuo account non è collegato a un profilo operatore. Chiedi al titolare di completare il collegamento.</div>}
+    </main>;
+  }
   const staffRows = await db.select({
     id: staffMembers.id,
     businessId: staffMembers.businessId,
@@ -23,9 +33,10 @@ export default async function StaffPage() {
     active: staffMembers.active,
     createdAt: staffMembers.createdAt,
     updatedAt: staffMembers.updatedAt,
+    userId: staffMembers.userId,
   }).from(staffMembers)
     .where(and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).orderBy(asc(staffMembers.name));
-  const staff = staffRows.map((member) => ({ ...member, userId: null as string | null }));
+  const staff = staffRows;
   const ownerIsOperator = staff.some((member) => member.userId === context.user.id);
   const emailConfigured = isStaffEmailConfigured();
   const catalog = await db.select({ id: services.id, name: services.name }).from(services)

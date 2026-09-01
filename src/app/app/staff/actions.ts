@@ -9,6 +9,7 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { issueStaffInvitation } from "@/lib/staff-invitations";
 import { parseTimeToMinutes } from "@/modules/availability/domain/time-slots";
 import { validateDailyShifts } from "@/modules/availability/domain/staff-shifts";
+import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 
 const weekdayValues = [1, 2, 3, 4, 5, 6, 0];
 
@@ -194,12 +195,19 @@ export async function deleteWorkingHours(formData: FormData) {
 }
 
 export async function addAbsence(formData: FormData) {
-  const context = await requireBusinessContext(); ownerOnly(context.role);
-  const input = z.object({ staffId: z.string().uuid(), startsAt: z.coerce.date(), endsAt: z.coerce.date(), reason: z.string().trim().max(120).optional() })
-    .parse({ staffId: formData.get("staffId"), startsAt: formData.get("startsAt"), endsAt: formData.get("endsAt"), reason: formData.get("reason") || undefined });
-  if (input.endsAt <= input.startsAt) throw new Error("La fine dell’assenza deve essere successiva all’inizio.");
-  const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.id, input.staffId), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).limit(1);
-  if (!staff) throw new Error("Operatore non valido.");
-  await db.insert(staffAbsences).values({ businessId: context.businessId, staffId: input.staffId, startsAt: input.startsAt, endsAt: input.endsAt, reason: input.reason });
+  const context = await requireBusinessContext();
+  if (!["OWNER", "STAFF"].includes(context.role)) throw new Error("Operazione non autorizzata.");
+  const input = z.object({ staffId: z.string().uuid().optional(), startsAt: z.string().min(16), endsAt: z.string().min(16), reason: z.string().trim().max(120).optional() })
+    .parse({ staffId: formData.get("staffId") || undefined, startsAt: formData.get("startsAt"), endsAt: formData.get("endsAt"), reason: formData.get("reason") || undefined });
+  const startsAt = zonedLocalToUtc(input.startsAt, context.timezone);
+  const endsAt = zonedLocalToUtc(input.endsAt, context.timezone);
+  if (endsAt <= startsAt) throw new Error("La fine dell’assenza deve essere successiva all’inizio.");
+  const conditions = [eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true)];
+  if (context.role === "STAFF") conditions.push(eq(staffMembers.userId, context.user.id));
+  else if (input.staffId) conditions.push(eq(staffMembers.id, input.staffId));
+  else throw new Error("Seleziona un operatore.");
+  const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers).where(and(...conditions)).limit(1);
+  if (!staff) throw new Error("Profilo operatore non collegato.");
+  await db.insert(staffAbsences).values({ businessId: context.businessId, staffId: staff.id, startsAt, endsAt, reason: input.reason });
   refreshStaffPages();
 }
