@@ -127,9 +127,4 @@
   .month-day-entries { display: none; }
 }
 
-@media (max-width: 760px) {
-  .agenda-appointment:has(.agenda-quick-actions) { padding-right: 102px; }
-  .agenda-quick-actions { flex-direction: row; }
-  .agenda-completion-note { right: 0; top: 52px; }
-  .agenda-failure-reasons { right: 0; top: 38px; }
-}
+
