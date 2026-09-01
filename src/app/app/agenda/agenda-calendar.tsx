@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
-import { changeAppointmentStatus, createAppointment, rescheduleAppointment } from "./actions";
+import { approveCustomerRescheduleRequest, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequest, rescheduleAppointment } from "./actions";
 import { CustomerAutofill } from "./customer-autofill";
 import { AppointmentPriceEditor } from "./appointment-price-editor";
 
@@ -31,6 +31,7 @@ type Data = {
   staff: Staff[];
   catalog: Service[];
   entries: Entry[];
+  rescheduleRequests: Array<{ id:string;appointmentId:string;customerName:string;serviceName:string;proposedStartsAt:string;proposedStaffName:string }>;
 };
 type Slot = { staffId: string; staffName: string; localStart: string; label: string };
 
@@ -232,6 +233,7 @@ export function AgendaCalendar({ today }: { today: string }) {
     </div>
 
     {error ? <p className="agenda-error" role="alert">{error}</p> : null}
+    {data.rescheduleRequests?.length ? <section className="panel"><h2>Richieste di modifica dei clienti</h2>{data.rescheduleRequests.map(request => <article className="data-row" key={request.id}><div><strong>{request.customerName} · {request.serviceName}</strong><p>Propone: {new Date(request.proposedStartsAt).toLocaleString("it-IT", { timeZone: data.timezone })} · {request.proposedStaffName}</p></div><div className="button-row"><form action={approveCustomerRescheduleRequest}><input type="hidden" name="id" value={request.id}/><button className="primary-button">Accetta</button></form><form action={rejectCustomerRescheduleRequest}><input type="hidden" name="id" value={request.id}/><button className="danger-button">Rifiuta</button></form></div></article>)}</section> : null}
 
     {data.canManage && showRevenue ? <section className="agenda-revenue-card">
       <div>
@@ -315,7 +317,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                     {data.canManage ? <label>Operatore<select name="staffId" defaultValue={entry.staffId}>
                       {data.staff.filter((memberOption) => data.catalog.some((catalogItem) => catalogItem.id === entry.serviceId && catalogItem.staffId === memberOption.id)).map((memberOption) => <option key={memberOption.id} value={memberOption.id}>{memberOption.name}</option>)}
                     </select></label> : null}
-                    <button className="ghost-button">Salva</button>
+                    <button className="ghost-button">Invia proposta al cliente</button>
                   </form>
                   {data.canManage ? <AppointmentPriceEditor appointmentId={entry.id} price={entry.price} onSaved={load} /> : null}
                 </details> : null}

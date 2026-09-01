@@ -4,3 +4,5 @@ export * from "./catalog";
 export * from "./booking";
 export * from "./staff-invitations";
 export * from "./fidelity";
+
+export * from "./reschedule";

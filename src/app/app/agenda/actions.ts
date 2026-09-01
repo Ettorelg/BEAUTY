@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   appointmentEvents,
+  appointmentRescheduleRequests,
   appointments,
   customerRelations,
   fidelityCards,
@@ -20,7 +21,9 @@ import {
 } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
-import { sendBookingConfirmation } from "@/lib/staff-invitations";
+import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
+import { sendBookingConfirmation, sendRescheduleApprovalEmail } from "@/lib/staff-invitations";
+import { approveRescheduleRequest, createRescheduleRequest } from "@/lib/reschedule-requests";
 import { isAppointmentStatus } from "@/modules/appointments/domain/status";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 import { calculateEarnedPoints } from "@/modules/fidelity/domain/rewards";
@@ -160,10 +163,10 @@ export async function rescheduleAppointment(formData: FormData) {
   const ownStaffId = context.role === "STAFF" ? await staffIdForCurrentUser(context.businessId, context.user.id) : undefined;
   if (context.role === "STAFF" && !ownStaffId) throw new Error("Profilo operatore non collegato.");
   await db.transaction(async (tx) => {
-    const [current] = await tx.select({ staffId: appointments.staffId, serviceId: appointments.serviceId, durationMinutes: appointments.durationMinutes, status: appointments.status })
+    const [current] = await tx.select({ staffId: appointments.staffId, serviceId: appointments.serviceId, serviceName: appointments.serviceName, durationMinutes: appointments.durationMinutes, status: appointments.status, version: appointments.version, customerId: appointments.customerRelationId })
       .from(appointments).where(and(eq(appointments.id, input.id), eq(appointments.businessId, context.businessId))).limit(1);
     if (!current || (ownStaffId && current.staffId !== ownStaffId)) throw new Error("Appuntamento non spostabile.");
-    if (context.role === "STAFF" && inArrayValue(finalStatuses, current.status)) throw new Error("Lo staff non può spostare un appuntamento concluso.");
+    if (!["BOOKED", "CONFIRMED"].includes(current.status)) throw new Error("Solo gli appuntamenti prenotati o confermati possono essere spostati.");
     const targetStaffId = context.role === "OWNER" ? input.staffId ?? current.staffId : current.staffId;
     const [assignment] = await tx.select({ id: staffServices.staffId }).from(staffServices).innerJoin(staffMembers, and(eq(staffServices.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId), eq(staffMembers.active, true))).where(and(eq(staffServices.businessId, context.businessId), eq(staffServices.staffId, targetStaffId), eq(staffServices.serviceId, current.serviceId))).limit(1);
     if (!assignment) throw new Error("Operatore non abilitato per questo servizio.");
@@ -192,8 +195,12 @@ export async function rescheduleAppointment(formData: FormData) {
       lt(appointments.startsAt, endsAt), gt(appointments.endsAt, startsAt), sql`not ${appointments.status} in ('COMPLETED','CANCELLED','NO_SHOW')`,
     )).limit(1);
     if (conflict) throw new Error("Fascia non disponibile.");
-    await tx.update(appointments).set({ staffId: targetStaffId, startsAt, endsAt, version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, input.id));
-    await tx.insert(appointmentEvents).values({ appointmentId: input.id, businessId: context.businessId, type: "RESCHEDULED", actorId: context.user.id, note: `${input.startsAt} · operatore ${targetStaffId}` });
-  });
+    const [customer] = await tx.select({ email: customerRelations.email }).from(customerRelations).where(and(eq(customerRelations.id, current.customerId), eq(customerRelations.businessId, context.businessId))).limit(1);
+    if (!customer?.email) throw new Error("Il cliente non ha un’email: non è possibile richiedere l’approvazione online.");
+    return { customerEmail: customer.email, serviceName: current.serviceName, startsAt, endsAt, staffId: targetStaffId, version: current.version };
+  }).then(async proposal => { const request = await createRescheduleRequest({ appointmentId: input.id, businessId: context.businessId, staffId: proposal.staffId, startsAt: proposal.startsAt, endsAt: proposal.endsAt, version: proposal.version, proposerType: "STAFF", proposedBy: context.user.id }); await sendRescheduleApprovalEmail({ email: proposal.customerEmail, businessName: context.businessName, serviceName: proposal.serviceName, startsAt: proposal.startsAt, timezone: context.timezone, token: request.token! }); });
   revalidatePath("/app/agenda");
 }
+
+export async function approveCustomerRescheduleRequest(formData:FormData){await ensureRescheduleSchema();const context=await requireBusinessContext(),id=z.string().uuid().parse(formData.get("id")),ownStaffId=context.role==="STAFF"?await staffIdForCurrentUser(context.businessId,context.user.id):undefined;const[request]=await db.select({id:appointmentRescheduleRequests.id,currentStaffId:appointments.staffId,proposerType:appointmentRescheduleRequests.proposerType}).from(appointmentRescheduleRequests).innerJoin(appointments,eq(appointments.id,appointmentRescheduleRequests.appointmentId)).where(and(eq(appointmentRescheduleRequests.id,id),eq(appointmentRescheduleRequests.businessId,context.businessId),eq(appointmentRescheduleRequests.status,"PENDING"))).limit(1);if(!request||request.proposerType!=="CUSTOMER"||(ownStaffId&&request.currentStaffId!==ownStaffId))throw new Error("Richiesta non autorizzata.");await approveRescheduleRequest(id,context.user.id);revalidatePath("/app/agenda");revalidatePath("/account");}
+export async function rejectCustomerRescheduleRequest(formData:FormData){await ensureRescheduleSchema();const context=await requireBusinessContext(),id=z.string().uuid().parse(formData.get("id")),ownStaffId=context.role==="STAFF"?await staffIdForCurrentUser(context.businessId,context.user.id):undefined;const[request]=await db.select({id:appointmentRescheduleRequests.id,currentStaffId:appointments.staffId,proposerType:appointmentRescheduleRequests.proposerType}).from(appointmentRescheduleRequests).innerJoin(appointments,eq(appointments.id,appointmentRescheduleRequests.appointmentId)).where(and(eq(appointmentRescheduleRequests.id,id),eq(appointmentRescheduleRequests.businessId,context.businessId),eq(appointmentRescheduleRequests.status,"PENDING"))).limit(1);if(!request||request.proposerType!=="CUSTOMER"||(ownStaffId&&request.currentStaffId!==ownStaffId))throw new Error("Richiesta non autorizzata.");await db.update(appointmentRescheduleRequests).set({status:"REJECTED",respondedAt:new Date()}).where(eq(appointmentRescheduleRequests.id,id));revalidatePath("/app/agenda");}

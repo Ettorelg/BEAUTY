@@ -100,3 +100,8 @@ export async function sendAbsenceConflictNotification({ email, businessName, ser
   });
   return response.ok;
 }
+export async function sendRescheduleApprovalEmail({ email, businessName, serviceName, startsAt, timezone, token }: { email:string;businessName:string;serviceName:string;startsAt:Date;timezone:string;token:string }) {
+  const apiKey=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM_EMAIL;if(!apiKey||!from)return false;
+  const base=(process.env.BETTER_AUTH_URL??process.env.APP_URL??"http://localhost:3000").replace(/\/$/,"");const url=`${base}/reschedule-request/${token}`,when=startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:timezone});
+  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":`reschedule-${token.slice(0,16)}`},body:JSON.stringify({from,to:[email],subject:`Richiesta modifica appuntamento · ${businessName}`,html:`<p>${escapeHtml(businessName)} propone di spostare <strong>${escapeHtml(serviceName)}</strong> al ${escapeHtml(when)}.</p><p><a href="${escapeHtml(url)}">Accetta o rifiuta la proposta</a></p><p>L’appuntamento attuale resta invariato finché non accetti.</p>`,text:`${businessName} propone di spostare ${serviceName} al ${when}. Accetta o rifiuta: ${url}. L’appuntamento attuale resta invariato finché non accetti.`})});return response.ok;
+}

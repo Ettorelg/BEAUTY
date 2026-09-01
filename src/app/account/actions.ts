@@ -6,11 +6,14 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { appointmentEvents, appointments, customerRelations, fidelityCards, fidelityRedemptions, staffAbsences, staffMembers, staffServices, workingHours } from "@/db/schema";
+import { appointmentEvents, appointmentRescheduleRequests, appointments, customerRelations, fidelityCards, fidelityRedemptions, staffAbsences, staffMembers, staffServices, workingHours } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
+import { createRescheduleRequest } from "@/lib/reschedule-requests";
+import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
 
 export async function cancelCustomerAppointment(formData: FormData) {
+  await ensureRescheduleSchema();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/account/login");
   const id = z.string().uuid().parse(formData.get("id"));
@@ -54,6 +57,7 @@ export async function cancelCustomerAppointment(formData: FormData) {
       await tx.update(fidelityRedemptions).set({ reversedAt: new Date() }).where(eq(fidelityRedemptions.id, redemption.id));
     }
 
+    await tx.update(appointmentRescheduleRequests).set({ status: "CANCELLED", respondedAt: new Date() }).where(and(eq(appointmentRescheduleRequests.appointmentId, id), eq(appointmentRescheduleRequests.status, "PENDING")));
     await tx.insert(appointmentEvents).values({
       appointmentId: id,
       businessId: booking.businessId,
@@ -69,6 +73,7 @@ export async function cancelCustomerAppointment(formData: FormData) {
 }
 
 export async function rescheduleCustomerAppointment(formData: FormData) {
+  await ensureRescheduleSchema();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/account/login");
   const input = z.object({ id: z.string().uuid(), staffId: z.string().uuid(), startsAt: z.string().min(16) }).parse(Object.fromEntries(formData));
@@ -95,9 +100,7 @@ export async function rescheduleCustomerAppointment(formData: FormData) {
     if (absence) throw new Error("L’operatore non è disponibile nell’orario scelto.");
     const [conflict] = await tx.select({ id: appointments.id }).from(appointments).where(and(eq(appointments.businessId, booking.businessId), eq(appointments.staffId, input.staffId), ne(appointments.id, booking.id), lt(appointments.startsAt, endsAt), gt(appointments.endsAt, startsAt), sql`"status" in ('BOOKED','CONFIRMED','ARRIVED')`)).limit(1);
     if (conflict) throw new Error("Lo slot è stato appena occupato. Scegline un altro.");
-    const updated = await tx.update(appointments).set({ staffId: input.staffId, startsAt, endsAt, reminderSentAt: null, version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(and(eq(appointments.id, booking.id), eq(appointments.version, booking.version))).returning({ id: appointments.id });
-    if (!updated.length) throw new Error("La prenotazione è stata aggiornata da un'altra operazione. Riprova.");
-    await tx.insert(appointmentEvents).values({ appointmentId: booking.id, businessId: booking.businessId, type: "RESCHEDULED", actorId: session.user.id, note: `Modificato dal cliente: ${input.startsAt}` });
-  });
-  revalidatePath("/account"); redirect("/account");
+    return { businessId: booking.businessId, staffId: input.staffId, startsAt, endsAt, version: booking.version };
+  }).then(proposal => createRescheduleRequest({ appointmentId: input.id, businessId: proposal.businessId, staffId: proposal.staffId, startsAt: proposal.startsAt, endsAt: proposal.endsAt, version: proposal.version, proposerType: "CUSTOMER", proposedBy: session.user.id }));
+  revalidatePath("/account"); revalidatePath("/app/agenda"); redirect("/account");
 }

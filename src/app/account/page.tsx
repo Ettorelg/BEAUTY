@@ -1,11 +1,12 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/app/app/logout-button";
 import { db } from "@/db/client";
-import { appointments, businesses, businessMemberships, customerRelations, fidelityCards, fidelityRedemptions, serviceCategories, services, users } from "@/db/schema";
+import { appointmentRescheduleRequests, appointments, businesses, businessMemberships, customerRelations, fidelityCards, fidelityRedemptions, serviceCategories, services, users } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
 import { cancelCustomerAppointment } from "./actions";
 import { SalonLinkOpener } from "./salon-link-opener";
 
@@ -33,6 +34,7 @@ function googleCalendarUrl(booking: { serviceName: string; businessName: string;
 export default async function CustomerAccountPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/account/login");
+  await ensureRescheduleSchema();
   const [profile] = await db.select({ phone: users.phone }).from(users).where(eq(users.id, session.user.id)).limit(1);
   if (session.user.emailVerified) {
     await db.update(customerRelations).set({ userId: session.user.id, updatedAt: new Date() }).where(and(isNull(customerRelations.userId), eq(customerRelations.email, session.user.email.toLowerCase())));
@@ -83,6 +85,9 @@ export default async function CustomerAccountPage() {
       .where(eq(customerRelations.userId, session.user.id))
       .orderBy(desc(fidelityRedemptions.createdAt)),
   ]);
+
+  const pendingChanges = await db.select({ appointmentId: appointmentRescheduleRequests.appointmentId }).from(appointmentRescheduleRequests).innerJoin(appointments, eq(appointments.id, appointmentRescheduleRequests.appointmentId)).innerJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId)).where(and(eq(customerRelations.userId, session.user.id), eq(appointmentRescheduleRequests.status, "PENDING"), gt(appointmentRescheduleRequests.expiresAt, new Date())));
+  const pendingChangeIds = new Set(pendingChanges.map(item => item.appointmentId));
 
   const now = new Date();
   const pendingBookings = bookings.filter((booking) => !concludedStatuses.has(booking.status));
@@ -137,7 +142,8 @@ export default async function CustomerAccountPage() {
               <div><p className="eyebrow">{labels[booking.status] ?? booking.status}</p><h3>{booking.serviceName} · {booking.businessName}</h3><p className="muted">{booking.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: booking.timezone })}</p><strong>€ {Number(booking.price).toFixed(2)}</strong></div>
               <div className="customer-booking-actions">
                 {booking.startsAt > now ? <a className="ghost-button link-button" href={googleCalendarUrl(booking)} target="_blank" rel="noreferrer">Aggiungi al calendario</a> : null}
-                {cancellable ? <><Link className="ghost-button link-button" href={`/account/appointments/${booking.id}`}>Modifica</Link><form action={cancelCustomerAppointment}><input type="hidden" name="id" value={booking.id} /><button className="danger-button">Annulla</button></form></> : null}
+                {pendingChangeIds.has(booking.id) ? <span className="status-pill">Modifica in attesa di approvazione</span> : null}
+                {cancellable && !pendingChangeIds.has(booking.id) ? <><Link className="ghost-button link-button" href={`/account/appointments/${booking.id}`}>Modifica</Link><form action={cancelCustomerAppointment}><input type="hidden" name="id" value={booking.id} /><button className="danger-button">Annulla</button></form></> : null}
               </div>
             </article>;
           })}
