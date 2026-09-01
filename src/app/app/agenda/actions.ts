@@ -210,12 +210,23 @@ export async function approveCustomerRescheduleRequest(formData: FormData) {
     .from(appointmentRescheduleRequests).innerJoin(appointments, eq(appointments.id, appointmentRescheduleRequests.appointmentId)).where(eq(appointmentRescheduleRequests.id, id)).limit(1);
   if (!request) throw new Error("Richiesta di modifica non trovata.");
   if (request.businessId !== context.businessId) throw new Error("Richiesta appartenente a un altro punto vendita.");
-  if (request.status !== "PENDING" || request.expiresAt <= new Date()) throw new Error("La richiesta è già stata gestita oppure è scaduta.");
+  if (request.status === "ACCEPTED") {
+    revalidatePath("/app/agenda");
+    revalidatePath("/account");
+    return;
+  }
+  if (request.status !== "PENDING") throw new Error("La richiesta è stata sostituita o rifiutata. Aggiorna l’agenda per vedere quella attiva.");
   if (request.proposerType !== "CUSTOMER") throw new Error("Questa proposta deve essere approvata dal cliente.");
   if (context.role === "STAFF") {
     const ownStaffId = await staffIdForCurrentUser(context.businessId, context.user.id);
     if (!ownStaffId || request.currentStaffId !== ownStaffId) throw new Error("La richiesta non riguarda un tuo appuntamento.");
   } else if (context.role !== "OWNER") throw new Error("Operazione riservata al titolare o allo staff assegnato.");
+  // Una proposta può essere rimasta aperta nel browser oltre le 24 ore. Il titolare
+  // o lo staff assegnato può ancora approvarla: il servizio ricontrolla disponibilità e conflitti.
+  if (request.expiresAt <= new Date()) {
+    await db.update(appointmentRescheduleRequests).set({ expiresAt: new Date(Date.now() + 5 * 60_000) })
+      .where(and(eq(appointmentRescheduleRequests.id, id), eq(appointmentRescheduleRequests.status, "PENDING")));
+  }
   await approveRescheduleRequest(id, context.user.id);
   revalidatePath("/app/agenda");
   revalidatePath("/account");
@@ -238,3 +249,4 @@ export async function rejectCustomerRescheduleRequest(formData: FormData) {
   revalidatePath("/app/agenda");
   revalidatePath("/account");
 }
+
