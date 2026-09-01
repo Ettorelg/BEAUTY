@@ -202,5 +202,39 @@ export async function rescheduleAppointment(formData: FormData) {
   revalidatePath("/app/agenda");
 }
 
-export async function approveCustomerRescheduleRequest(formData:FormData){await ensureRescheduleSchema();const context=await requireBusinessContext(),id=z.string().uuid().parse(formData.get("id")),ownStaffId=context.role==="STAFF"?await staffIdForCurrentUser(context.businessId,context.user.id):undefined;const[request]=await db.select({id:appointmentRescheduleRequests.id,currentStaffId:appointments.staffId,proposerType:appointmentRescheduleRequests.proposerType}).from(appointmentRescheduleRequests).innerJoin(appointments,eq(appointments.id,appointmentRescheduleRequests.appointmentId)).where(and(eq(appointmentRescheduleRequests.id,id),eq(appointmentRescheduleRequests.businessId,context.businessId),eq(appointmentRescheduleRequests.status,"PENDING"))).limit(1);if(!request||request.proposerType!=="CUSTOMER"||(ownStaffId&&request.currentStaffId!==ownStaffId))throw new Error("Richiesta non autorizzata.");await approveRescheduleRequest(id,context.user.id);revalidatePath("/app/agenda");revalidatePath("/account");}
-export async function rejectCustomerRescheduleRequest(formData:FormData){await ensureRescheduleSchema();const context=await requireBusinessContext(),id=z.string().uuid().parse(formData.get("id")),ownStaffId=context.role==="STAFF"?await staffIdForCurrentUser(context.businessId,context.user.id):undefined;const[request]=await db.select({id:appointmentRescheduleRequests.id,currentStaffId:appointments.staffId,proposerType:appointmentRescheduleRequests.proposerType}).from(appointmentRescheduleRequests).innerJoin(appointments,eq(appointments.id,appointmentRescheduleRequests.appointmentId)).where(and(eq(appointmentRescheduleRequests.id,id),eq(appointmentRescheduleRequests.businessId,context.businessId),eq(appointmentRescheduleRequests.status,"PENDING"))).limit(1);if(!request||request.proposerType!=="CUSTOMER"||(ownStaffId&&request.currentStaffId!==ownStaffId))throw new Error("Richiesta non autorizzata.");await db.update(appointmentRescheduleRequests).set({status:"REJECTED",respondedAt:new Date()}).where(eq(appointmentRescheduleRequests.id,id));revalidatePath("/app/agenda");}
+export async function approveCustomerRescheduleRequest(formData: FormData) {
+  await ensureRescheduleSchema();
+  const context = await requireBusinessContext();
+  const id = z.string().uuid().parse(formData.get("id"));
+  const [request] = await db.select({ id: appointmentRescheduleRequests.id, businessId: appointmentRescheduleRequests.businessId, status: appointmentRescheduleRequests.status, expiresAt: appointmentRescheduleRequests.expiresAt, proposerType: appointmentRescheduleRequests.proposerType, currentStaffId: appointments.staffId })
+    .from(appointmentRescheduleRequests).innerJoin(appointments, eq(appointments.id, appointmentRescheduleRequests.appointmentId)).where(eq(appointmentRescheduleRequests.id, id)).limit(1);
+  if (!request) throw new Error("Richiesta di modifica non trovata.");
+  if (request.businessId !== context.businessId) throw new Error("Richiesta appartenente a un altro punto vendita.");
+  if (request.status !== "PENDING" || request.expiresAt <= new Date()) throw new Error("La richiesta è già stata gestita oppure è scaduta.");
+  if (request.proposerType !== "CUSTOMER") throw new Error("Questa proposta deve essere approvata dal cliente.");
+  if (context.role === "STAFF") {
+    const ownStaffId = await staffIdForCurrentUser(context.businessId, context.user.id);
+    if (!ownStaffId || request.currentStaffId !== ownStaffId) throw new Error("La richiesta non riguarda un tuo appuntamento.");
+  } else if (context.role !== "OWNER") throw new Error("Operazione riservata al titolare o allo staff assegnato.");
+  await approveRescheduleRequest(id, context.user.id);
+  revalidatePath("/app/agenda");
+  revalidatePath("/account");
+}
+
+export async function rejectCustomerRescheduleRequest(formData: FormData) {
+  await ensureRescheduleSchema();
+  const context = await requireBusinessContext();
+  const id = z.string().uuid().parse(formData.get("id"));
+  const [request] = await db.select({ businessId: appointmentRescheduleRequests.businessId, status: appointmentRescheduleRequests.status, proposerType: appointmentRescheduleRequests.proposerType, currentStaffId: appointments.staffId })
+    .from(appointmentRescheduleRequests).innerJoin(appointments, eq(appointments.id, appointmentRescheduleRequests.appointmentId)).where(eq(appointmentRescheduleRequests.id, id)).limit(1);
+  if (!request || request.businessId !== context.businessId) throw new Error("Richiesta non disponibile per questo punto vendita.");
+  if (request.status !== "PENDING") throw new Error("La richiesta è già stata gestita.");
+  if (request.proposerType !== "CUSTOMER") throw new Error("Questa proposta deve essere gestita dal cliente.");
+  if (context.role === "STAFF") {
+    const ownStaffId = await staffIdForCurrentUser(context.businessId, context.user.id);
+    if (!ownStaffId || request.currentStaffId !== ownStaffId) throw new Error("La richiesta non riguarda un tuo appuntamento.");
+  } else if (context.role !== "OWNER") throw new Error("Operazione riservata al titolare o allo staff assegnato.");
+  await db.update(appointmentRescheduleRequests).set({ status: "REJECTED", respondedAt: new Date() }).where(eq(appointmentRescheduleRequests.id, id));
+  revalidatePath("/app/agenda");
+  revalidatePath("/account");
+}
