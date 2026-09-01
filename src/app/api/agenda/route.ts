@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { appointments, customerRelations, services, staffInvitations, staffMembers, staffServices } from "@/db/schema";
+import { appointments, customerRelations, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, startOfCalendarMonth, startOfCalendarWeek, startOfCalendarYear, type AgendaView } from "@/modules/agenda/domain/calendar";
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     ? eq(staffMembers.businessId, context.businessId)
     : and(eq(staffMembers.businessId, context.businessId), eq(staffMembers.id, ownStaff!.id));
 
-  const [staff, catalog, rawEntries] = await Promise.all([
+  const [staff, catalog, rawEntries, absences] = await Promise.all([
     db
       .select({ id: staffMembers.id, name: staffMembers.name })
       .from(staffMembers)
@@ -87,6 +87,8 @@ export async function GET(request: NextRequest) {
         ),
       )
       .orderBy(asc(appointments.startsAt)),
+    db.select({ staffId: staffAbsences.staffId, startsAt: staffAbsences.startsAt, endsAt: staffAbsences.endsAt })
+      .from(staffAbsences).where(and(eq(staffAbsences.businessId, context.businessId), lt(staffAbsences.startsAt, end), gte(staffAbsences.endsAt, start))),
   ]);
 
   const customerIds = [...new Set(rawEntries.map((entry) => entry.customerId))];
@@ -105,6 +107,7 @@ export async function GET(request: NextRequest) {
     : [];
   const entries = rawEntries.map((entry) => ({
     ...entry,
+    absenceConflict: ["BOOKED", "CONFIRMED", "ARRIVED"].includes(entry.status) && absences.some((absence) => absence.staffId === entry.staffId && absence.startsAt < entry.endsAt && absence.endsAt > entry.startsAt),
     rememberedNote: noteHistory.find((item) =>
       item.customerId === entry.customerId &&
       item.serviceId === entry.serviceId &&

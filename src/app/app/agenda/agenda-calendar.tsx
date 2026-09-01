@@ -20,6 +20,7 @@ type Entry = {
   staffName: string;
   price: string;
   rememberedNote?: string | null;
+  absenceConflict?: boolean;
 };
 type Data = {
   date: string;
@@ -286,7 +287,7 @@ export function AgendaCalendar({ today }: { today: string }) {
           <strong>{day.slice(8)}</strong>
         </header>
         {data.entries.filter((entry) => dayForEntry(entry) === day).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id}>
-          <span>{time(entry.startsAt)}</span><strong>{entry.customerName}</strong><small>{entry.serviceName} · {entry.staffName}</small><small className="agenda-price">{money(Number(entry.price))}</small><em>{statusLabels[entry.status]}</em>
+          <span>{time(entry.startsAt)}</span><strong>{entry.customerName}</strong><small>{entry.serviceName} · {entry.staffName}</small><small className="agenda-price">{money(Number(entry.price))}</small><em>{statusLabels[entry.status]}</em>{entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto assenza</strong> : null}
         </article>)}
       </section>)}
     </div> : <div className="agenda-scroll">
@@ -304,6 +305,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                 <small>{entry.serviceName} · {entry.staffName}</small>
                 <small className="agenda-price">{money(Number(entry.price))}</small>
                 <em>{statusLabels[entry.status]}</em>
+                {entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto con assenza</strong> : null}
                 {entry.rememberedNote ? <p className="agenda-remembered-note"><strong>Nota precedente:</strong> {entry.rememberedNote}</p> : null}
                 {data.canManage || !["COMPLETED", "CANCELLED", "NO_SHOW"].includes(entry.status) ? <details className="agenda-reschedule">
                   <summary>Modifica</summary>

@@ -4,9 +4,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { appointments, businessMemberships, serviceCategories, services, staffAbsences, staffInvitations, staffMembers, staffServices, workingHours } from "@/db/schema";
+import { appointments, businessMemberships, customerRelations, serviceCategories, services, staffAbsences, staffInvitations, staffMembers, staffServices, workingHours } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
-import { issueStaffInvitation } from "@/lib/staff-invitations";
+import { issueStaffInvitation, sendAbsenceConflictNotification } from "@/lib/staff-invitations";
 import { parseTimeToMinutes } from "@/modules/availability/domain/time-slots";
 import { validateDailyShifts } from "@/modules/availability/domain/staff-shifts";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
@@ -197,8 +197,8 @@ export async function deleteWorkingHours(formData: FormData) {
 export async function addAbsence(formData: FormData) {
   const context = await requireBusinessContext();
   if (!["OWNER", "STAFF"].includes(context.role)) throw new Error("Operazione non autorizzata.");
-  const input = z.object({ staffId: z.string().uuid().optional(), startsAt: z.string().min(16), endsAt: z.string().min(16), reason: z.string().trim().max(120).optional() })
-    .parse({ staffId: formData.get("staffId") || undefined, startsAt: formData.get("startsAt"), endsAt: formData.get("endsAt"), reason: formData.get("reason") || undefined });
+  const input = z.object({ staffId: z.string().uuid().optional(), startsAt: z.string().min(16), endsAt: z.string().min(16), reason: z.string().trim().max(120).optional(), force: z.enum(["0", "1"]).default("0") })
+    .parse({ staffId: formData.get("staffId") || undefined, startsAt: formData.get("startsAt"), endsAt: formData.get("endsAt"), reason: formData.get("reason") || undefined, force: String(formData.get("force") || "0") });
   const startsAt = zonedLocalToUtc(input.startsAt, context.timezone);
   const endsAt = zonedLocalToUtc(input.endsAt, context.timezone);
   if (endsAt <= startsAt) throw new Error("La fine dell’assenza deve essere successiva all’inizio.");
@@ -208,6 +208,21 @@ export async function addAbsence(formData: FormData) {
   else throw new Error("Seleziona un operatore.");
   const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers).where(and(...conditions)).limit(1);
   if (!staff) throw new Error("Profilo operatore non collegato.");
-  await db.insert(staffAbsences).values({ businessId: context.businessId, staffId: staff.id, startsAt, endsAt, reason: input.reason });
+  const conflicts = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${staff.id}))`);
+    const rows = await tx.select({ id: appointments.id, email: customerRelations.email, serviceName: appointments.serviceName, startsAt: appointments.startsAt })
+      .from(appointments).leftJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId)).where(and(
+        eq(appointments.businessId, context.businessId), eq(appointments.staffId, staff.id),
+        sql`${appointments.status} in ('BOOKED', 'CONFIRMED', 'ARRIVED')`,
+        sql`${appointments.startsAt} < ${endsAt}`, sql`${appointments.endsAt} > ${startsAt}`,
+      ));
+    if (rows.length && input.force !== "1") throw new Error("Sono presenti appuntamenti sovrapposti. Spostali oppure conferma esplicitamente l’assenza.");
+    await tx.insert(staffAbsences).values({ businessId: context.businessId, staffId: staff.id, startsAt, endsAt, reason: input.reason });
+    return rows;
+  });
+  if (input.force === "1") await Promise.allSettled(conflicts.filter(item => item.email).map(item => sendAbsenceConflictNotification({
+    email: item.email!, businessName: context.businessName, serviceName: item.serviceName, startsAt: item.startsAt, timezone: context.timezone, appointmentId: item.id,
+  })));
   refreshStaffPages();
+  revalidatePath("/app/agenda");
 }

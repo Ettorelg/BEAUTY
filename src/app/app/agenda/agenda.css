@@ -128,3 +128,5 @@
 }
 
 
+
+.agenda-absence-warning { grid-column: 1 / -1; padding: 4px 7px; border-radius: 8px; background: #fff0c7; color: #7a4900; font-size: .72rem; line-height: 1.2; }
