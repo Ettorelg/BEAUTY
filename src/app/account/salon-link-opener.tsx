@@ -7,6 +7,7 @@ type Detector = { detect(source: ImageBitmapSource): Promise<Array<{ rawValue: s
 export function SalonLinkOpener() {
   const [value, setValue] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [showLink, setShowLink] = useState(false);
   const [error, setError] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -61,9 +62,9 @@ export function SalonLinkOpener() {
     }
   }
 
-  return <section className="panel salon-link-opener">
-    <div><p className="eyebrow">Aggiungi punto vendita</p><h2>Apri il salone dal suo invito</h2><p className="muted">Incolla il link ricevuto oppure inquadra il QR code. Il salone resterà tra i tuoi saloni dopo la prima prenotazione.</p></div>
-    <div className="salon-link-controls"><input type="url" value={value} onChange={(event) => setValue(event.target.value)} placeholder="https://beauty.alphasystemsrl.it/s/..." /><button className="primary-button" type="button" onClick={() => openSalon()}>Apri link</button><button className="ghost-button" type="button" onClick={scanning ? stop : scan}>{scanning ? "Chiudi fotocamera" : "Inquadra QR code"}</button></div>
+return <section className="panel salon-link-opener">
+    <div className="salon-link-compact"><h2>Aggiungi punto vendita</h2><div className="button-row"><button className="primary-button" type="button" onClick={() => { setShowLink((visible) => !visible); setError(""); }}>{showLink ? "Chiudi" : "Apri link"}</button><button className="ghost-button" type="button" onClick={scanning ? stop : scan}>{scanning ? "Chiudi fotocamera" : "Inquadra QR code"}</button></div></div>
+    {showLink ? <div className="salon-link-controls"><input autoFocus type="url" value={value} onChange={(event) => setValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") openSalon(); }} placeholder="Incolla il link del salone" /><button className="primary-button" type="button" onClick={() => openSalon()}>Vai al salone</button></div> : null}
     {scanning ? <video className="salon-qr-video" ref={videoRef} muted playsInline /> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
   </section>;
