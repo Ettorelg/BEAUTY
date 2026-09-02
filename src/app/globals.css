@@ -80,10 +80,12 @@ button { cursor: pointer; }
 .dashboard-shell { width: min(1120px, calc(100% - 32px)); padding-top: 28px; }
 .app-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 42px; }
 .app-header p { margin: 0 0 4px; font-size: .72rem; }
-.app-nav { display: flex; gap: 8px; overflow-x: auto; margin: -24px 0 34px; padding-bottom: 8px; }
-.app-nav a, .app-nav span { flex: 0 0 auto; padding: 9px 12px; border-radius: 999px; color: #5f554f; text-decoration: none; font-size: .88rem; }
-.app-nav a { background: white; border: 1px solid #e4ddd8; }
-.app-nav span { color: #a09792; }
+.app-nav { display: flex; gap: 10px; overflow-x: auto; margin: -24px 0 34px; padding: 6px 4px 12px; }
+.app-nav a { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 11px 16px; border: 1px solid #d9ccc5; border-radius: 14px; background: #fff; color: #493a33; text-decoration: none; font-size: .9rem; font-weight: 750; box-shadow: 0 3px 10px rgba(69, 49, 39, .06); transition: transform .15s ease, background .15s ease, color .15s ease, border-color .15s ease; }
+.app-nav a > span { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 7px; background: #f0e5df; color: #775648; font-size: .9rem; font-weight: 900; }
+.app-nav a:hover { transform: translateY(-2px); border-color: #8a6555; background: #faf5f2; }
+.app-nav a[aria-current="page"] { border-color: #765344; background: #765344; color: #fff; box-shadow: 0 7px 18px rgba(80, 54, 43, .22); }
+.app-nav a[aria-current="page"] > span { background: rgba(255,255,255,.2); color: #fff; }
 .welcome-panel { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; padding: 34px; border-radius: 24px; background: #2d2420; color: white; }
 .welcome-panel h1 { margin-bottom: 8px; }
 .welcome-panel p { margin: 0; }
@@ -388,3 +390,4 @@ button { cursor: pointer; }
   .site-footer nav { justify-content: flex-start; flex-wrap: wrap; gap: 12px 18px; }
   .site-footer-legal { grid-column: 1; }
 }
+
