@@ -8,6 +8,7 @@ import { db } from "@/db/client";
 import { businessMemberships, businesses, locations } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { normalizeBusinessSlug } from "@/modules/businesses/domain/business-slug";
+import { ensureBusinessProfileSchema } from "@/lib/ensure-business-profile-schema";
 
 const onboardingSchema = z.object({
   businessName: z.string().trim().min(2).max(100),
@@ -36,6 +37,8 @@ export async function onboardBusiness(formData: FormData) {
   const baseSlug = normalizeBusinessSlug(input.businessName) || "salone";
   const suffix = crypto.randomUUID().slice(0, 6);
   const slug = `${baseSlug}-${suffix}`;
+
+  await ensureBusinessProfileSchema();
 
   await db.transaction(async (tx) => {
     const [business] = await tx
