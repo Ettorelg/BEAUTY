@@ -38,6 +38,8 @@ export const appointments = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     timezone: text("timezone").notNull(),
     status: text("status").notNull().default("BOOKED"),
+    paymentStatus: text("payment_status").notNull().default("NOT_DUE"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
     notes: text("notes"),
     source: text("source").notNull().default("BACKOFFICE"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -69,3 +71,4 @@ export const appointmentEvents = pgTable(
   },
   (table) => [index("appointment_events_appointment_idx").on(table.appointmentId)],
 );
+

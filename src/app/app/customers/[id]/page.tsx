@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { appointments, customerRelations, fidelityCards, fidelityRedemptions, fidelityRules, services, staffMembers } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
+import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
 import { AppNav } from "../../app-nav";
 import { mergeDuplicateCustomers, redeemFidelityReward } from "./actions";
 
@@ -16,6 +17,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const context = await requireBusinessContext();
   const { id } = await params;
   await ensureFidelitySchema();
+  await ensurePaymentSchema();
   const [customer] = await db.select().from(customerRelations).where(and(
     eq(customerRelations.id, id),
     eq(customerRelations.businessId, context.businessId),
@@ -23,7 +25,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   if (!customer) notFound();
 
   const [history, [card], rules, redemptions, catalog] = await Promise.all([
-    db.select({ id: appointments.id, startsAt: appointments.startsAt, status: appointments.status, service: appointments.serviceName, price: appointments.price, staff: staffMembers.name })
+    db.select({ id: appointments.id, startsAt: appointments.startsAt, status: appointments.status, service: appointments.serviceName, price: appointments.price, paymentStatus: appointments.paymentStatus, staff: staffMembers.name })
       .from(appointments).innerJoin(staffMembers, eq(appointments.staffId, staffMembers.id))
       .where(and(eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, id)))
       .orderBy(asc(appointments.startsAt)),
@@ -36,6 +38,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const names = new Map(catalog.map((service) => [service.id, service.name]));
   const done = history.filter((appointment) => appointment.status === "COMPLETED");
   const spent = done.reduce((total, appointment) => total + Number(appointment.price), 0);
+  const outstanding = done.filter((appointment) => appointment.paymentStatus === "UNPAID").reduce((total, appointment) => total + Number(appointment.price), 0);
   const serviceStats = Object.values(done.reduce<Record<string, { name: string; count: number }>>((map, appointment) => {
     map[appointment.service] ??= { name: appointment.service, count: 0 };
     map[appointment.service].count++;
@@ -52,6 +55,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <article className="module-card"><h2>{done.length}</h2><p>Servizi eseguiti</p></article>
       <article className="module-card"><h2>{last?.service ?? "—"}</h2><p>Ultimo servizio</p></article>
       <article className="module-card"><h2>{card?.points ?? 0}</h2><p>Punti Fidelity</p></article>
+      <article className="module-card"><h2>€ {outstanding.toFixed(2)}</h2><p>Pagamenti in sospeso</p></article>
     </section>
     <section className="management-grid">
       <article className="panel"><h2>Servizi effettuati</h2>{serviceStats.length ? serviceStats.map((service) => <p key={service.name}><strong>{service.name}</strong> · {service.count} ({Math.round(service.count / done.length * 100)}%)</p>) : <p className="muted">Nessun servizio eseguito.</p>}</article>
@@ -62,6 +66,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <article className="panel"><h2>Schede duplicate</h2><p className="muted">Unisce automaticamente le schede con la stessa email o lo stesso telefono, conservando appuntamenti, punti e riscatti.</p><form action={mergeDuplicateCustomers}><input type="hidden" name="customerId" value={id}/><button className="ghost-button">Cerca e unisci duplicati</button></form></article>
     </section> : null}
     <section className="management-grid"><article className="panel"><h2>Premi riscattati</h2>{redemptions.length ? redemptions.map((item) => <p key={item.id}><strong>{rewardLabel(item.rewardType, item.rewardValue, item.serviceId ? names.get(item.serviceId) : null)}</strong><br/><span className="muted">-{item.pointsSpent} punti · {item.createdAt.toLocaleString("it-IT", { timeZone: context.timezone })}</span></p>) : <p className="muted">Nessun premio riscattato.</p>}</article></section>
-    <section className="list-section"><h2>Cronologia completa</h2><div className="data-list">{history.map((appointment) => <article className="data-row" key={appointment.id}><div><h3>{appointment.service} · € {Number(appointment.price).toFixed(2)}</h3><p className="muted">{appointment.startsAt.toLocaleString("it-IT", { timeZone: context.timezone })} · {appointment.staff} · {appointment.status}</p></div></article>)}</div></section>
+    <section className="list-section"><h2>Cronologia completa</h2><div className="data-list">{history.map((appointment) => <article className="data-row" key={appointment.id}><div><h3>{appointment.service} · € {Number(appointment.price).toFixed(2)}</h3><p className="muted">{appointment.startsAt.toLocaleString("it-IT", { timeZone: context.timezone })} · {appointment.staff} · {appointment.status} · {appointment.paymentStatus === "UNPAID" ? "PAGAMENTO IN SOSPESO" : appointment.paymentStatus === "PAID" ? "PAGATO" : ""}</p></div></article>)}</div></section>
   </main>;
 }
+

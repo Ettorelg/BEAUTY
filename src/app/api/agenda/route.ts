@@ -4,12 +4,14 @@ import { db } from "@/db/client";
 import { appointmentRescheduleRequests, appointments, customerRelations, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
+import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
 import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, startOfCalendarMonth, startOfCalendarWeek, startOfCalendarYear, type AgendaView } from "@/modules/agenda/domain/calendar";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 
 export async function GET(request: NextRequest) {
   await ensureFidelitySchema();
+  await ensurePaymentSchema();
   await ensureRescheduleSchema();
   const context = await requireBusinessContext();
   const isOwner = context.role === "OWNER";
@@ -75,6 +77,7 @@ export async function GET(request: NextRequest) {
         staffId: staffMembers.id,
         staffName: staffMembers.name,
         price: appointments.price,
+        paymentStatus: appointments.paymentStatus,
         notes: appointments.notes,
       })
       .from(appointments)
@@ -95,6 +98,13 @@ export async function GET(request: NextRequest) {
 
   const customerIds = [...new Set(rawEntries.map((entry) => entry.customerId))];
   const serviceIds = [...new Set(rawEntries.map((entry) => entry.serviceId))];
+  const unpaidRows = customerIds.length
+    ? await db.select({ customerId: appointments.customerRelationId, price: appointments.price }).from(appointments).where(and(
+        eq(appointments.businessId, context.businessId), eq(appointments.status, "COMPLETED"),
+        eq(appointments.paymentStatus, "UNPAID"), inArray(appointments.customerRelationId, customerIds),
+      ))
+    : [];
+  const outstandingByCustomer = unpaidRows.reduce((map, row) => map.set(row.customerId, (map.get(row.customerId) ?? 0) + Number(row.price)), new Map<string, number>());
   const noteHistory = customerIds.length && serviceIds.length
     ? await db.select({ customerId: appointments.customerRelationId, serviceId: appointments.serviceId, startsAt: appointments.startsAt, notes: appointments.notes })
         .from(appointments)
@@ -109,6 +119,7 @@ export async function GET(request: NextRequest) {
     : [];
   const entries = rawEntries.map((entry) => ({
     ...entry,
+    previousOutstanding: outstandingByCustomer.get(entry.customerId) ?? 0,
     absenceConflict: ["BOOKED", "CONFIRMED", "ARRIVED"].includes(entry.status) && absences.some((absence) => absence.staffId === entry.staffId && absence.startsAt < entry.endsAt && absence.endsAt > entry.startsAt),
     rememberedNote: noteHistory.find((item) =>
       item.customerId === entry.customerId &&
@@ -123,3 +134,4 @@ export async function GET(request: NextRequest) {
   const staffNames = new Map(staff.map(member => [member.id, member.name]));
   return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, staff, catalog, entries, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
 }
+

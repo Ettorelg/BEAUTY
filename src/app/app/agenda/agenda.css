@@ -130,3 +130,7 @@
 
 
 .agenda-absence-warning { grid-column: 1 / -1; padding: 4px 7px; border-radius: 8px; background: #fff0c7; color: #7a4900; font-size: .72rem; line-height: 1.2; }
+.agenda-outstanding-badge { grid-column: 1 / -1; width: max-content; max-width: 100%; padding: 4px 7px; border-radius: 8px; background: #fff0c7; color: #704d00 !important; font-weight: 800; }
+.agenda-payment-summary { display: grid; grid-template-columns: 1fr auto; gap: 5px 14px; margin: 6px 0; padding: 10px; border-radius: 10px; background: #fff7df; }
+.agenda-payment-summary strong { text-align: right; }
+.agenda-payment-summary span:last-of-type, .agenda-payment-summary strong:last-child { padding-top: 6px; border-top: 1px solid #dfc888; font-weight: 900; }

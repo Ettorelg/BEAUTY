@@ -19,6 +19,8 @@ type Entry = {
   staffId: string;
   staffName: string;
   price: string;
+  paymentStatus: string;
+  previousOutstanding: number;
   rememberedNote?: string | null;
   absenceConflict?: boolean;
 };
@@ -141,6 +143,7 @@ export function AgendaCalendar({ today }: { today: string }) {
   const [failureFor, setFailureFor] = useState("");
   const [completionFor, setCompletionFor] = useState("");
   const [completionNote, setCompletionNote] = useState("");
+  const [completionPayment, setCompletionPayment] = useState<"PAID" | "UNPAID">("PAID");
   const [error, setError] = useState("");
   const [reschedulePending, setReschedulePending] = useState("");
 
@@ -200,11 +203,12 @@ export function AgendaCalendar({ today }: { today: string }) {
     setView("day");
   }
 
-  async function updateStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW", note?: string) {
+  async function updateStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW", note?: string, paymentStatus?: "PAID" | "UNPAID") {
     const formData = new FormData();
     formData.set("id", id);
     formData.set("status", status);
     if (note?.trim()) formData.set("completionNote", note.trim());
+    if (paymentStatus) formData.set("paymentStatus", paymentStatus);
     try {
       await changeAppointmentStatus(formData);
       setFailureFor("");
@@ -322,6 +326,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                 <strong>{entry.customerName}</strong>
                 <small>{entry.serviceName} · {entry.staffName}</small>
                 <small className="agenda-price">{money(Number(entry.price))}</small>
+                {entry.previousOutstanding > 0 ? <small className="agenda-outstanding-badge">Sospeso {money(entry.previousOutstanding)} · Totale {money(entry.previousOutstanding + Number(entry.price))}</small> : null}
                 <em>{statusLabels[entry.status]}</em>
                 {entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto con assenza</strong> : null}
                 {entry.rememberedNote ? <p className="agenda-remembered-note"><strong>Nota precedente:</strong> {entry.rememberedNote}</p> : null}
@@ -338,11 +343,13 @@ export function AgendaCalendar({ today }: { today: string }) {
                   {data.canManage ? <AppointmentPriceEditor appointmentId={entry.id} price={entry.price} onSaved={load} /> : null}
                 </details> : null}
                 {editableStatuses.includes(entry.status) ? <div className="agenda-quick-actions">
-                  <button type="button" className="agenda-complete-button" aria-label="Aggiungi note e segna come eseguito" title="Aggiungi note e completa" onClick={() => { setCompletionFor(completionFor === entry.id ? "" : entry.id); setCompletionNote(entry.rememberedNote ?? ""); setFailureFor(""); }}>&#10003;</button>
+                  <button type="button" className="agenda-complete-button" aria-label="Aggiungi note e segna come eseguito" title="Aggiungi note e completa" onClick={() => { setCompletionFor(completionFor === entry.id ? "" : entry.id); setCompletionNote(entry.rememberedNote ?? ""); setCompletionPayment("PAID"); setFailureFor(""); }}>&#10003;</button>
                   {completionFor === entry.id ? <div className="agenda-completion-note">
                     <label>Note del trattamento<textarea value={completionNote} maxLength={500} placeholder="Prodotti usati, preferenze, risultato…" onChange={(event) => setCompletionNote(event.target.value)} /></label>
                     {entry.rememberedNote ? <small>È stata precaricata la nota precedente di questo cliente per {entry.serviceName}.</small> : null}
-                    <div><button type="button" className="agenda-note-confirm" onClick={() => void updateStatus(entry.id, "COMPLETED", completionNote)}>Conferma eseguito</button><button type="button" onClick={() => { setCompletionFor(""); setCompletionNote(""); }}>Annulla</button></div>
+                    {entry.previousOutstanding > 0 ? <div className="agenda-payment-summary"><span>Sospeso precedente</span><strong>{money(entry.previousOutstanding)}</strong><span>Servizio corrente</span><strong>{money(Number(entry.price))}</strong><span>Totale cliente</span><strong>{money(entry.previousOutstanding + Number(entry.price))}</strong></div> : null}
+                    {data.canManage ? <label>Pagamento<select value={completionPayment} onChange={(event) => setCompletionPayment(event.target.value as "PAID" | "UNPAID")}><option value="PAID">Pagato</option><option value="UNPAID">In sospeso</option></select></label> : <small>Il pagamento sarà registrato come in sospeso e potrà essere verificato dal titolare.</small>}
+                    <div><button type="button" className="agenda-note-confirm" onClick={() => void updateStatus(entry.id, "COMPLETED", completionNote, data.canManage ? completionPayment : "UNPAID")}>Conferma eseguito</button><button type="button" onClick={() => { setCompletionFor(""); setCompletionNote(""); setCompletionPayment("PAID"); }}>Annulla</button></div>
                   </div> : null}
                   <button type="button" className="agenda-failure-button" aria-label="Segna come non concluso" title="Non concluso" onClick={() => setFailureFor(failureFor === entry.id ? "" : entry.id)}>&#10005;</button>
                   {failureFor === entry.id ? <div className="agenda-failure-reasons">
@@ -361,4 +368,6 @@ export function AgendaCalendar({ today }: { today: string }) {
     {open ? <Booking data={data} date={date} close={() => setOpen(false)} done={load} /> : null}
   </>;
 }
+
+
 

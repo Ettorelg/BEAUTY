@@ -21,6 +21,7 @@ import {
 } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
+import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
 import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
 import { sendBookingConfirmation, sendRescheduleApprovalEmail } from "@/lib/staff-invitations";
 import { approveRescheduleRequest, createRescheduleRequest } from "@/lib/reschedule-requests";
@@ -123,16 +124,19 @@ export async function changeAppointmentStatus(formData: FormData) {
   const id = z.string().uuid().parse(formData.get("id"));
   const next = z.string().parse(formData.get("status"));
   const completionNote = z.string().trim().max(500).optional().parse(formData.get("completionNote") || undefined);
+  const requestedPayment = z.enum(["PAID", "UNPAID"]).optional().parse(formData.get("paymentStatus") || undefined);
   if (!isAppointmentStatus(next) || !inArrayValue(finalStatuses, next)) throw new Error("Stato non valido.");
   const ownStaffId = context.role === "STAFF" ? await staffIdForCurrentUser(context.businessId, context.user.id) : undefined;
   if (context.role === "STAFF" && !ownStaffId) throw new Error("Profilo operatore non collegato.");
-  if (next === "COMPLETED") await ensureFidelitySchema();
+  if (next === "COMPLETED") { await ensureFidelitySchema(); await ensurePaymentSchema(); }
   await db.transaction(async (tx) => {
-    const [current] = await tx.select({ status: appointments.status, staffId: appointments.staffId, customerId: appointments.customerRelationId, price: appointments.price })
+    const [current] = await tx.select({ status: appointments.status, staffId: appointments.staffId, customerId: appointments.customerRelationId, price: appointments.price, paymentStatus: appointments.paymentStatus })
       .from(appointments).where(and(eq(appointments.id, id), eq(appointments.businessId, context.businessId))).limit(1);
     if (!current || (ownStaffId && current.staffId !== ownStaffId)) throw new Error("Appuntamento non disponibile.");
-    await tx.update(appointments).set({ status: next, ...(next === "COMPLETED" && completionNote ? { notes: completionNote } : {}), version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, id));
-    await tx.insert(appointmentEvents).values({ appointmentId: id, businessId: context.businessId, type: "STATUS_CHANGED", fromStatus: current.status, toStatus: next, actorId: context.user.id, note: next === "COMPLETED" ? completionNote : undefined });
+    const paymentStatus = next === "COMPLETED" ? (context.role === "OWNER" ? requestedPayment ?? "UNPAID" : "UNPAID") : "NOT_DUE";
+    const paidAt = paymentStatus === "PAID" ? new Date() : null;
+    await tx.update(appointments).set({ status: next, paymentStatus, paidAt, ...(next === "COMPLETED" && completionNote ? { notes: completionNote } : {}), version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, id));
+    await tx.insert(appointmentEvents).values({ appointmentId: id, businessId: context.businessId, type: "STATUS_CHANGED", fromStatus: current.status, toStatus: next, actorId: context.user.id, note: next === "COMPLETED" ? [completionNote, `Pagamento: ${paymentStatus === "PAID" ? "pagato" : "in sospeso"}`].filter(Boolean).join(" · ") : undefined });
     if (next === "CANCELLED" && current.status !== "CANCELLED") {
       const [redemption] = await tx.select().from(fidelityRedemptions).where(and(eq(fidelityRedemptions.appointmentId, id), isNull(fidelityRedemptions.reversedAt))).limit(1);
       if (redemption) {
@@ -266,3 +270,4 @@ export async function rejectCustomerRescheduleRequestSafely(formData: FormData):
     return { ok: false, error: error instanceof Error ? error.message : "Impossibile rifiutare la modifica." };
   }
 }
+

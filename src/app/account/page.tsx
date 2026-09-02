@@ -143,7 +143,7 @@ export default async function CustomerAccountPage() {
               <div className="customer-booking-actions">
                 {booking.startsAt > now ? <a className="ghost-button link-button" href={googleCalendarUrl(booking)} target="_blank" rel="noreferrer">Aggiungi al calendario</a> : null}
                 {pendingChangeIds.has(booking.id) ? <span className="status-pill">Modifica in attesa di approvazione</span> : null}
-                {cancellable && !pendingChangeIds.has(booking.id) ? <><Link className="ghost-button link-button" href={`/account/appointments/${booking.id}`}>Modifica</Link><form action={cancelCustomerAppointment}><input type="hidden" name="id" value={booking.id} /><button className="danger-button">Annulla</button></form></> : null}
+                {cancellable ? <><Link className="ghost-button link-button" href={`/account/appointments/${booking.id}`}>{pendingChangeIds.has(booking.id) ? "Cambia proposta" : "Modifica"}</Link><form action={cancelCustomerAppointment}><input type="hidden" name="id" value={booking.id} /><button className="danger-button">Annulla</button></form></> : null}
               </div>
             </article>;
           })}
@@ -167,3 +167,4 @@ export default async function CustomerAccountPage() {
     </details>
   </main>;
 }
+
