@@ -23,6 +23,7 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
 import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
+import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
 import { sendBookingConfirmation, sendRescheduleApprovalEmail } from "@/lib/staff-invitations";
 import { approveRescheduleRequest, createRescheduleRequest } from "@/lib/reschedule-requests";
 import { isAppointmentStatus } from "@/modules/appointments/domain/status";
@@ -53,6 +54,7 @@ async function staffIdForCurrentUser(businessId: string, userId: string) {
 }
 
 async function createAppointmentOrThrow(formData: FormData) {
+  await ensureServicePricingSchema();
   const context = await requireBusinessContext();
   if (context.role !== "OWNER") throw new Error("Solo il titolare può creare appuntamenti manuali.");
   const input = bookingSchema.parse({
@@ -60,7 +62,7 @@ async function createAppointmentOrThrow(formData: FormData) {
     email: formData.get("email") || undefined, phone: formData.get("phone") || undefined,
     startsAt: formData.get("startsAt"), notes: formData.get("notes") || undefined, idempotencyKey: formData.get("idempotencyKey"),
   });
-  const [selection] = await db.select({ serviceName: services.name, durationMinutes: services.durationMinutes, price: services.price })
+  const [selection] = await db.select({ serviceName: services.name, durationMinutes: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice })
     .from(staffServices).innerJoin(staffMembers, and(eq(staffServices.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId)))
     .innerJoin(services, and(eq(staffServices.serviceId, services.id), eq(services.businessId, context.businessId), eq(services.active, true)))
     .where(and(eq(staffServices.businessId, context.businessId), eq(staffServices.staffId, input.staffId), eq(staffServices.serviceId, input.serviceId))).limit(1);
@@ -97,10 +99,15 @@ async function createAppointmentOrThrow(formData: FormData) {
       businessId: context.businessId, name: input.customerName, email, phone,
     }).returning({ id: customerRelations.id }))[0].id;
     if (known) await tx.update(customerRelations).set({ name: input.customerName, email, phone, updatedAt: new Date() }).where(eq(customerRelations.id, known.id));
+    const [previousService] = await tx.select({ id: appointments.id }).from(appointments).where(and(
+      eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, customerId),
+      eq(appointments.serviceId, input.serviceId), eq(appointments.status, "COMPLETED"),
+    )).limit(1);
+    const bookingPrice = previousService && selection.repeatPrice != null ? selection.repeatPrice : selection.price;
     const [created] = await tx.insert(appointments).values({
       businessId: context.businessId, locationId: context.locationId, customerRelationId: customerId,
       staffId: input.staffId, serviceId: input.serviceId, serviceName: selection.serviceName,
-      durationMinutes: selection.durationMinutes, price: selection.price, startsAt, endsAt,
+      durationMinutes: selection.durationMinutes, price: bookingPrice, startsAt, endsAt,
       timezone: context.timezone, notes: input.notes, createdBy: context.user.id, idempotencyKey: input.idempotencyKey,
     }).onConflictDoNothing({ target: [appointments.businessId, appointments.idempotencyKey] }).returning({ id: appointments.id });
     if (created) { createdAppointment = true; await tx.insert(appointmentEvents).values({ appointmentId: created.id, businessId: context.businessId, type: "CREATED", toStatus: "BOOKED", actorId: context.user.id }); }
@@ -166,21 +173,26 @@ export async function changeAppointmentService(formData: FormData) {
   if (context.role !== "OWNER") throw new Error("Operazione riservata al titolare.");
   const input = z.object({ id: z.string().uuid(), serviceId: z.string().uuid() }).parse(Object.fromEntries(formData));
   await db.transaction(async (tx) => {
-    const [current] = await tx.select({ serviceName: appointments.serviceName, startsAt: appointments.startsAt, status: appointments.status }).from(appointments).where(and(
+    const [current] = await tx.select({ serviceName: appointments.serviceName, startsAt: appointments.startsAt, status: appointments.status, customerId: appointments.customerRelationId }).from(appointments).where(and(
       eq(appointments.id, input.id), eq(appointments.businessId, context.businessId),
     )).limit(1);
     if (!current) throw new Error("Appuntamento non trovato.");
     if (!["BOOKED", "CONFIRMED", "ARRIVED"].includes(current.status)) throw new Error("Il servizio può essere cambiato solo su un appuntamento attivo.");
-    const [service] = await tx.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price }).from(services).where(and(
+    const [service] = await tx.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice }).from(services).where(and(
       eq(services.id, input.serviceId), eq(services.businessId, context.businessId), eq(services.active, true),
     )).limit(1);
     if (!service) throw new Error("Servizio non disponibile.");
     const endsAt = new Date(current.startsAt.getTime() + service.duration * 60_000);
+    const [previousService] = await tx.select({ id: appointments.id }).from(appointments).where(and(
+      eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, current.customerId),
+      eq(appointments.serviceId, service.id), eq(appointments.status, "COMPLETED"), ne(appointments.id, input.id),
+    )).limit(1);
+    const servicePrice = previousService && service.repeatPrice != null ? service.repeatPrice : service.price;
     await tx.update(appointments).set({
       serviceId: service.id,
       serviceName: service.name,
       durationMinutes: service.duration,
-      price: String(service.price),
+      price: String(servicePrice),
       endsAt,
       version: sql`${appointments.version} + 1`,
       updatedAt: new Date(),
@@ -304,6 +316,8 @@ export async function rejectCustomerRescheduleRequestSafely(formData: FormData):
     return { ok: false, error: error instanceof Error ? error.message : "Impossibile rifiutare la modifica." };
   }
 }
+
+
 
 
 

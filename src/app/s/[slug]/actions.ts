@@ -23,6 +23,7 @@ import {
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { sendBookingConfirmation } from "@/lib/staff-invitations";
+import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
 import { getPublicAvailability } from "@/modules/availability/application/public-availability";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 import { calculateBookingPriceCents } from "@/modules/fidelity/domain/booking-price";
@@ -46,6 +47,7 @@ const schema = z.object({
 });
 
 export async function createPublicAppointment(formData: FormData) {
+  await ensureServicePricingSchema();
   const input = schema.parse(Object.fromEntries(formData));
   const session = await auth.api.getSession({ headers: await headers() });
   const { staffId, startsAt: localStart } = input.selection;
@@ -59,6 +61,7 @@ export async function createPublicAppointment(formData: FormData) {
     serviceName: services.name,
     duration: services.durationMinutes,
     price: services.price,
+    repeatPrice: services.repeatPrice,
   }).from(businesses)
     .innerJoin(locations, eq(locations.businessId, businesses.id))
     .innerJoin(services, and(eq(services.businessId, businesses.id), eq(services.id, input.serviceId), eq(services.active, true), eq(services.onlineBookable, true)))
@@ -102,15 +105,21 @@ export async function createPublicAppointment(formData: FormData) {
     const customerId = known?.id ?? (await tx.insert(customerRelations).values({ businessId: selection.businessId, userId: signedIn?.id ?? null, name: input.customerName, email, phone: input.phone }).returning({ id: customerRelations.id }))[0].id;
     if (known) await tx.update(customerRelations).set({ userId: signedIn?.id ?? null, name: input.customerName, phone: input.phone, updatedAt: new Date() }).where(eq(customerRelations.id, known.id));
 
+    const [previousService] = await tx.select({ id: appointments.id }).from(appointments).where(and(
+      eq(appointments.businessId, selection.businessId), eq(appointments.customerRelationId, customerId),
+      eq(appointments.serviceId, input.serviceId), eq(appointments.status, "COMPLETED"),
+    )).limit(1);
+    const basePrice = previousService && selection.repeatPrice != null ? selection.repeatPrice : selection.price;
+
     const [fidelityConfig] = await tx.select({ allowRewardStacking: fidelitySettings.allowRewardStacking }).from(fidelitySettings).where(eq(fidelitySettings.businessId, selection.businessId)).limit(1);
-    let priceCents = calculateBookingPriceCents(Math.round(Number(selection.price) * 100), promotion?.discount ?? 0);
+    let priceCents = calculateBookingPriceCents(Math.round(Number(basePrice) * 100), promotion?.discount ?? 0);
     let reward: typeof fidelityRules.$inferSelect | undefined;
     if (input.rewardRuleId) {
       [reward] = await tx.select().from(fidelityRules).where(and(eq(fidelityRules.id, input.rewardRuleId), eq(fidelityRules.businessId, selection.businessId))).limit(1);
       if (!reward || (reward.serviceId && reward.serviceId !== input.serviceId)) throw Error("Il bonus selezionato non è valido per questo servizio.");
       const [card] = await tx.select({ points: fidelityCards.points, expiresAt: fidelityCards.pointsExpiresAt }).from(fidelityCards).where(and(eq(fidelityCards.businessId, selection.businessId), eq(fidelityCards.customerRelationId, customerId))).limit(1);
       if (!card || (card.expiresAt && card.expiresAt < new Date()) || card.points < reward.points) throw Error("Punti Fidelity insufficienti o scaduti.");
-      priceCents = calculateBookingPriceCents(Math.round(Number(selection.price) * 100), promotion?.discount ?? 0, reward, fidelityConfig?.allowRewardStacking ?? false);
+      priceCents = calculateBookingPriceCents(Math.round(Number(basePrice) * 100), promotion?.discount ?? 0, reward, fidelityConfig?.allowRewardStacking ?? false);
     }
 
     const [created] = await tx.insert(appointments).values({
@@ -144,3 +153,4 @@ export async function createPublicAppointment(formData: FormData) {
   await sendBookingConfirmation({ email: input.email, businessName: selection.businessName ?? input.slug, serviceName: selection.serviceName, startsAt, timezone: selection.timezone, address: selection.address, phone: selection.phone });
   redirect(`/s/${input.slug}/conferma${signedIn ? "" : "?account=1"}`);
 }
+

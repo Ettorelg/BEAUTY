@@ -29,6 +29,7 @@ export const services = pgTable(
     description: text("description"),
     durationMinutes: integer("duration_minutes").notNull(),
     price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+    repeatPrice: numeric("repeat_price", { precision: 10, scale: 2 }),
     active: boolean("active").notNull().default(true),
     onlineBookable: boolean("online_bookable").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -109,3 +110,4 @@ export const staffAbsences = pgTable(
     index("staff_absences_business_idx").on(table.businessId),
   ],
 );
+

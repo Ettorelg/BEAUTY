@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { appointments, serviceCategories, services, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
+import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
 
 const categorySchema = z.object({ name: z.string().trim().min(2).max(60) });
 const serviceSchema = z.object({
@@ -14,6 +15,7 @@ const serviceSchema = z.object({
   description: z.string().trim().max(180).optional(),
   durationMinutes: z.coerce.number().int().min(5).max(480),
   price: z.coerce.number().min(0).max(100000),
+  repeatPrice: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().min(0).max(100000).optional()),
   onlineBookable: z.coerce.boolean(),
 });
 
@@ -35,13 +37,14 @@ export async function createCategory(formData: FormData) {
 }
 
 export async function createService(formData: FormData) {
+  await ensureServicePricingSchema();
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const input = serviceSchema.parse({
     categoryId: formData.get("categoryId"),
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     durationMinutes: formData.get("durationMinutes"),
-    price: formData.get("price"),
+    price: formData.get("price"), repeatPrice: formData.get("repeatPrice"),
     onlineBookable: formData.get("onlineBookable") === "on",
   });
   const [category] = await db.select({ id: serviceCategories.id }).from(serviceCategories)
@@ -54,22 +57,24 @@ export async function createService(formData: FormData) {
     description: input.description,
     durationMinutes: input.durationMinutes,
     price: input.price.toFixed(2),
+    repeatPrice: input.repeatPrice?.toFixed(2) ?? null,
     onlineBookable: input.onlineBookable,
   });
   refreshServicePages();
 }
 
 export async function updateService(formData: FormData) {
+  await ensureServicePricingSchema();
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const input = serviceSchema.extend({ id: z.string().uuid() }).parse({
     id: formData.get("id"), categoryId: formData.get("categoryId"), name: formData.get("name"),
     description: formData.get("description") || undefined, durationMinutes: formData.get("durationMinutes"),
-    price: formData.get("price"), onlineBookable: formData.get("onlineBookable") === "on",
+    price: formData.get("price"), repeatPrice: formData.get("repeatPrice"), onlineBookable: formData.get("onlineBookable") === "on",
   });
   const [category] = await db.select({ id: serviceCategories.id }).from(serviceCategories)
     .where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.businessId, context.businessId), eq(serviceCategories.active, true))).limit(1);
   if (!category) throw new Error("Categoria non valida.");
-  await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, price: input.price.toFixed(2), onlineBookable: input.onlineBookable, updatedAt: new Date() })
+  await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, price: input.price.toFixed(2), repeatPrice: input.repeatPrice?.toFixed(2) ?? null, onlineBookable: input.onlineBookable, updatedAt: new Date() })
     .where(and(eq(services.id, input.id), eq(services.businessId, context.businessId)));
   refreshServicePages();
 }
@@ -82,6 +87,8 @@ export async function deleteService(formData: FormData) {
     .where(and(eq(services.id, id), eq(services.businessId, context.businessId)));
   refreshServicePages();
 }
+
+
 
 
 
