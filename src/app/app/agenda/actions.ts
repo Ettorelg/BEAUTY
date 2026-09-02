@@ -62,13 +62,12 @@ async function createAppointmentOrThrow(formData: FormData) {
     email: formData.get("email") || undefined, phone: formData.get("phone") || undefined,
     startsAt: formData.get("startsAt"), notes: formData.get("notes") || undefined, idempotencyKey: formData.get("idempotencyKey"),
   });
-  const [selection] = await db.select({ serviceName: services.name, durationMinutes: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice, repeatPriceEnabled: services.repeatPriceEnabled })
+  const [selection] = await db.select({ serviceName: services.name, durationMinutes: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice, repeatPriceEnabled: services.repeatPriceEnabled, repeatDurationMinutes: services.repeatDurationMinutes })
     .from(staffServices).innerJoin(staffMembers, and(eq(staffServices.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId)))
     .innerJoin(services, and(eq(staffServices.serviceId, services.id), eq(services.businessId, context.businessId), eq(services.active, true)))
     .where(and(eq(staffServices.businessId, context.businessId), eq(staffServices.staffId, input.staffId), eq(staffServices.serviceId, input.serviceId))).limit(1);
   if (!selection) throw new Error("Operatore non abilitato per questo servizio.");
   const startsAt = zonedLocalToUtc(input.startsAt, context.timezone);
-  const endsAt = new Date(startsAt.getTime() + selection.durationMinutes * 60_000);
   if (startsAt <= new Date()) throw new Error("L’appuntamento deve essere nel futuro.");
   const email = input.email?.toLowerCase();
   const phone = normalizePhone(input.phone);
@@ -76,12 +75,7 @@ async function createAppointmentOrThrow(formData: FormData) {
   let createdAppointment = false;
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.staffId}))`);
-    const [conflict] = await tx.select({ id: appointments.id }).from(appointments).where(and(
-      eq(appointments.businessId, context.businessId), eq(appointments.staffId, input.staffId),
-      lt(appointments.startsAt, endsAt), gt(appointments.endsAt, startsAt), sql`not ${appointments.status} in ('COMPLETED','CANCELLED','NO_SHOW')`,
-    )).limit(1);
-    if (conflict) throw new Error("Lo slot non è più disponibile.");
-    const identity = or(
+const identity = or(
       email ? eq(sql`lower(${customerRelations.email})`, email) : undefined,
       phone ? eq(sql`regexp_replace(coalesce(${customerRelations.phone}, ''), '\\D', '', 'g')`, phone) : undefined,
     );
@@ -103,11 +97,18 @@ async function createAppointmentOrThrow(formData: FormData) {
       eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, customerId),
       eq(appointments.serviceId, input.serviceId), eq(appointments.status, "COMPLETED"),
     )).limit(1);
+    const bookingDuration = previousService && selection.repeatDurationMinutes != null ? selection.repeatDurationMinutes : selection.durationMinutes;
+    const endsAt = new Date(startsAt.getTime() + bookingDuration * 60_000);
+    const [conflict] = await tx.select({ id: appointments.id }).from(appointments).where(and(
+      eq(appointments.businessId, context.businessId), eq(appointments.staffId, input.staffId),
+      lt(appointments.startsAt, endsAt), gt(appointments.endsAt, startsAt), sql`not ${appointments.status} in ('COMPLETED','CANCELLED','NO_SHOW')`,
+    )).limit(1);
+    if (conflict) throw new Error("Lo slot non è più disponibile per la durata prevista.");
     const bookingPrice = previousService && selection.repeatPriceEnabled && selection.repeatPrice != null ? selection.repeatPrice : selection.price;
     const [created] = await tx.insert(appointments).values({
       businessId: context.businessId, locationId: context.locationId, customerRelationId: customerId,
       staffId: input.staffId, serviceId: input.serviceId, serviceName: selection.serviceName,
-      durationMinutes: selection.durationMinutes, price: bookingPrice, startsAt, endsAt,
+      durationMinutes: bookingDuration, price: bookingPrice, startsAt, endsAt,
       timezone: context.timezone, notes: input.notes, createdBy: context.user.id, idempotencyKey: input.idempotencyKey,
     }).onConflictDoNothing({ target: [appointments.businessId, appointments.idempotencyKey] }).returning({ id: appointments.id });
     if (created) { createdAppointment = true; await tx.insert(appointmentEvents).values({ appointmentId: created.id, businessId: context.businessId, type: "CREATED", toStatus: "BOOKED", actorId: context.user.id }); }
@@ -178,20 +179,21 @@ export async function changeAppointmentService(formData: FormData) {
     )).limit(1);
     if (!current) throw new Error("Appuntamento non trovato.");
     if (!["BOOKED", "CONFIRMED", "ARRIVED"].includes(current.status)) throw new Error("Il servizio può essere cambiato solo su un appuntamento attivo.");
-    const [service] = await tx.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice, repeatPriceEnabled: services.repeatPriceEnabled }).from(services).where(and(
+    const [service] = await tx.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice, repeatPriceEnabled: services.repeatPriceEnabled, repeatDurationMinutes: services.repeatDurationMinutes }).from(services).where(and(
       eq(services.id, input.serviceId), eq(services.businessId, context.businessId), eq(services.active, true),
     )).limit(1);
     if (!service) throw new Error("Servizio non disponibile.");
-    const endsAt = new Date(current.startsAt.getTime() + service.duration * 60_000);
     const [previousService] = await tx.select({ id: appointments.id }).from(appointments).where(and(
       eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, current.customerId),
       eq(appointments.serviceId, service.id), eq(appointments.status, "COMPLETED"), ne(appointments.id, input.id),
     )).limit(1);
+    const serviceDuration = previousService && service.repeatDurationMinutes != null ? service.repeatDurationMinutes : service.duration;
+    const endsAt = new Date(current.startsAt.getTime() + serviceDuration * 60_000);
     const servicePrice = previousService && service.repeatPriceEnabled && service.repeatPrice != null ? service.repeatPrice : service.price;
     await tx.update(appointments).set({
       serviceId: service.id,
       serviceName: service.name,
-      durationMinutes: service.duration,
+      durationMinutes: serviceDuration,
       price: String(servicePrice),
       endsAt,
       version: sql`${appointments.version} + 1`,

@@ -17,6 +17,7 @@ const serviceSchema = z.object({
   price: z.coerce.number().min(0).max(100000),
   repeatPrice: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().min(0).max(100000).optional()),
   repeatPriceEnabled: z.coerce.boolean(),
+  repeatDurationMinutes: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().int().min(5).max(480).optional()),
   onlineBookable: z.coerce.boolean(),
 });
 
@@ -45,7 +46,7 @@ export async function createService(formData: FormData) {
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     durationMinutes: formData.get("durationMinutes"),
-    price: formData.get("price"), repeatPrice: formData.get("repeatPrice"), repeatPriceEnabled: formData.get("repeatPriceEnabled") === "on",
+    price: formData.get("price"), repeatPrice: formData.get("repeatPrice"), repeatPriceEnabled: formData.get("repeatPriceEnabled") === "on", repeatDurationMinutes: formData.get("repeatDurationMinutes"),
     onlineBookable: formData.get("onlineBookable") === "on",
   });
   const [category] = await db.select({ id: serviceCategories.id }).from(serviceCategories)
@@ -60,6 +61,7 @@ export async function createService(formData: FormData) {
     price: input.price.toFixed(2),
     repeatPrice: input.repeatPrice?.toFixed(2) ?? null,
     repeatPriceEnabled: input.repeatPriceEnabled && input.repeatPrice != null,
+    repeatDurationMinutes: input.repeatDurationMinutes ?? null,
     onlineBookable: input.onlineBookable,
   });
   refreshServicePages();
@@ -71,12 +73,12 @@ export async function updateService(formData: FormData) {
   const input = serviceSchema.extend({ id: z.string().uuid() }).parse({
     id: formData.get("id"), categoryId: formData.get("categoryId"), name: formData.get("name"),
     description: formData.get("description") || undefined, durationMinutes: formData.get("durationMinutes"),
-    price: formData.get("price"), repeatPrice: formData.get("repeatPrice"), repeatPriceEnabled: formData.get("repeatPriceEnabled") === "on", onlineBookable: formData.get("onlineBookable") === "on",
+    price: formData.get("price"), repeatPrice: formData.get("repeatPrice"), repeatPriceEnabled: formData.get("repeatPriceEnabled") === "on", repeatDurationMinutes: formData.get("repeatDurationMinutes"), onlineBookable: formData.get("onlineBookable") === "on",
   });
   const [category] = await db.select({ id: serviceCategories.id }).from(serviceCategories)
     .where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.businessId, context.businessId), eq(serviceCategories.active, true))).limit(1);
   if (!category) throw new Error("Categoria non valida.");
-  await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, price: input.price.toFixed(2), repeatPrice: input.repeatPrice?.toFixed(2) ?? null, repeatPriceEnabled: input.repeatPriceEnabled && input.repeatPrice != null, onlineBookable: input.onlineBookable, updatedAt: new Date() })
+  await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, price: input.price.toFixed(2), repeatPrice: input.repeatPrice?.toFixed(2) ?? null, repeatPriceEnabled: input.repeatPriceEnabled && input.repeatPrice != null, repeatDurationMinutes: input.repeatDurationMinutes ?? null, onlineBookable: input.onlineBookable, updatedAt: new Date() })
     .where(and(eq(services.id, input.id), eq(services.businessId, context.businessId)));
   refreshServicePages();
 }

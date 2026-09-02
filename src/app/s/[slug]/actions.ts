@@ -63,6 +63,7 @@ export async function createPublicAppointment(formData: FormData) {
     price: services.price,
     repeatPrice: services.repeatPrice,
     repeatPriceEnabled: services.repeatPriceEnabled,
+    repeatDuration: services.repeatDurationMinutes,
   }).from(businesses)
     .innerJoin(locations, eq(locations.businessId, businesses.id))
     .innerJoin(services, and(eq(services.businessId, businesses.id), eq(services.id, input.serviceId), eq(services.active, true), eq(services.onlineBookable, true)))
@@ -87,16 +88,7 @@ export async function createPublicAppointment(formData: FormData) {
 
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${staffId}))`);
-    const [busy] = await tx.select({ id: appointments.id }).from(appointments).where(and(
-      eq(appointments.businessId, selection.businessId),
-      eq(appointments.staffId, staffId),
-      lt(appointments.startsAt, new Date(startsAt.getTime() + selection.duration * 60_000)),
-      gt(appointments.endsAt, startsAt),
-      sql`"status" in ('BOOKED','CONFIRMED','ARRIVED')`,
-    )).limit(1);
-    if (busy) throw Error("Lo slot non è più disponibile.");
-
-    const email = input.email.toLowerCase();
+const email = input.email.toLowerCase();
     if (signedIn) await tx.update(users).set({ phone: input.phone, updatedAt: new Date() }).where(eq(users.id, signedIn.id));
     const normalizedPhone = input.phone.replace(/\D/g, "");
     const knownRows = signedIn
@@ -110,6 +102,15 @@ export async function createPublicAppointment(formData: FormData) {
       eq(appointments.businessId, selection.businessId), eq(appointments.customerRelationId, customerId),
       eq(appointments.serviceId, input.serviceId), eq(appointments.status, "COMPLETED"),
     )).limit(1);
+    const effectiveDuration = previousService && selection.repeatDuration != null ? selection.repeatDuration : selection.duration;
+    const effectiveSlots = await getPublicAvailability({ businessId: selection.businessId, serviceId: input.serviceId, date, durationMinutes: effectiveDuration, timezone: selection.timezone });
+    if (!effectiveSlots.some((slot) => slot.staffId === staffId && slot.localStart === localStart)) throw Error("Lo slot non è disponibile per la durata prevista.");
+    const [busy] = await tx.select({ id: appointments.id }).from(appointments).where(and(
+      eq(appointments.businessId, selection.businessId), eq(appointments.staffId, staffId),
+      lt(appointments.startsAt, new Date(startsAt.getTime() + effectiveDuration * 60_000)), gt(appointments.endsAt, startsAt),
+      sql`"status" in ('BOOKED','CONFIRMED','ARRIVED')`,
+    )).limit(1);
+    if (busy) throw Error("Lo slot non è più disponibile per la durata prevista.");
     const basePrice = previousService && selection.repeatPriceEnabled && selection.repeatPrice != null ? selection.repeatPrice : selection.price;
 
     const [fidelityConfig] = await tx.select({ allowRewardStacking: fidelitySettings.allowRewardStacking }).from(fidelitySettings).where(eq(fidelitySettings.businessId, selection.businessId)).limit(1);
@@ -130,10 +131,10 @@ export async function createPublicAppointment(formData: FormData) {
       staffId,
       serviceId: input.serviceId,
       serviceName: selection.serviceName,
-      durationMinutes: selection.duration,
+      durationMinutes: effectiveDuration,
       price: (priceCents / 100).toFixed(2),
       startsAt,
-      endsAt: new Date(startsAt.getTime() + selection.duration * 60_000),
+      endsAt: new Date(startsAt.getTime() + effectiveDuration * 60_000),
       timezone: selection.timezone,
       source: "PUBLIC",
       idempotencyKey: input.idempotencyKey,
