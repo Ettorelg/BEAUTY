@@ -165,6 +165,15 @@ export async function saveWorkingDay(formData: FormData) {
   refreshStaffPages();
 }
 
+export async function saveWorkingDayState(_state: { ok: boolean; error?: string }, formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await saveWorkingDay(formData);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Impossibile salvare i turni." };
+  }
+}
+
 export async function addWorkingHours(formData: FormData) {
   const context = await requireBusinessContext(); ownerOnly(context.role);
   const staffId = z.string().uuid().parse(formData.get("staffId"));
