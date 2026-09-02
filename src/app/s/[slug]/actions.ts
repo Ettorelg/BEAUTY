@@ -62,6 +62,7 @@ export async function createPublicAppointment(formData: FormData) {
     duration: services.durationMinutes,
     price: services.price,
     repeatPrice: services.repeatPrice,
+    repeatPriceEnabled: services.repeatPriceEnabled,
   }).from(businesses)
     .innerJoin(locations, eq(locations.businessId, businesses.id))
     .innerJoin(services, and(eq(services.businessId, businesses.id), eq(services.id, input.serviceId), eq(services.active, true), eq(services.onlineBookable, true)))
@@ -109,7 +110,7 @@ export async function createPublicAppointment(formData: FormData) {
       eq(appointments.businessId, selection.businessId), eq(appointments.customerRelationId, customerId),
       eq(appointments.serviceId, input.serviceId), eq(appointments.status, "COMPLETED"),
     )).limit(1);
-    const basePrice = previousService && selection.repeatPrice != null ? selection.repeatPrice : selection.price;
+    const basePrice = previousService && selection.repeatPriceEnabled && selection.repeatPrice != null ? selection.repeatPrice : selection.price;
 
     const [fidelityConfig] = await tx.select({ allowRewardStacking: fidelitySettings.allowRewardStacking }).from(fidelitySettings).where(eq(fidelitySettings.businessId, selection.businessId)).limit(1);
     let priceCents = calculateBookingPriceCents(Math.round(Number(basePrice) * 100), promotion?.discount ?? 0);

@@ -4,6 +4,9 @@ import { db } from "@/db/client";
 let ready: Promise<void> | undefined;
 
 export function ensureServicePricingSchema() {
-  ready ??= db.execute(sql.raw("ALTER TABLE services ADD COLUMN IF NOT EXISTS repeat_price numeric(10,2)")).then(() => undefined);
+  ready ??= (async () => {
+    await db.execute(sql.raw("ALTER TABLE services ADD COLUMN IF NOT EXISTS repeat_price numeric(10,2)"));
+    await db.execute(sql.raw("ALTER TABLE services ADD COLUMN IF NOT EXISTS repeat_price_enabled boolean NOT NULL DEFAULT false"));
+  })();
   return ready;
 }

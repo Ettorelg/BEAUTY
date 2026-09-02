@@ -30,6 +30,7 @@ export const services = pgTable(
     durationMinutes: integer("duration_minutes").notNull(),
     price: numeric("price", { precision: 10, scale: 2 }).notNull(),
     repeatPrice: numeric("repeat_price", { precision: 10, scale: 2 }),
+    repeatPriceEnabled: boolean("repeat_price_enabled").notNull().default(false),
     active: boolean("active").notNull().default(true),
     onlineBookable: boolean("online_bookable").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

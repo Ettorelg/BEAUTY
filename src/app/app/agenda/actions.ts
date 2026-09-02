@@ -62,7 +62,7 @@ async function createAppointmentOrThrow(formData: FormData) {
     email: formData.get("email") || undefined, phone: formData.get("phone") || undefined,
     startsAt: formData.get("startsAt"), notes: formData.get("notes") || undefined, idempotencyKey: formData.get("idempotencyKey"),
   });
-  const [selection] = await db.select({ serviceName: services.name, durationMinutes: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice })
+  const [selection] = await db.select({ serviceName: services.name, durationMinutes: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice, repeatPriceEnabled: services.repeatPriceEnabled })
     .from(staffServices).innerJoin(staffMembers, and(eq(staffServices.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId)))
     .innerJoin(services, and(eq(staffServices.serviceId, services.id), eq(services.businessId, context.businessId), eq(services.active, true)))
     .where(and(eq(staffServices.businessId, context.businessId), eq(staffServices.staffId, input.staffId), eq(staffServices.serviceId, input.serviceId))).limit(1);
@@ -103,7 +103,7 @@ async function createAppointmentOrThrow(formData: FormData) {
       eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, customerId),
       eq(appointments.serviceId, input.serviceId), eq(appointments.status, "COMPLETED"),
     )).limit(1);
-    const bookingPrice = previousService && selection.repeatPrice != null ? selection.repeatPrice : selection.price;
+    const bookingPrice = previousService && selection.repeatPriceEnabled && selection.repeatPrice != null ? selection.repeatPrice : selection.price;
     const [created] = await tx.insert(appointments).values({
       businessId: context.businessId, locationId: context.locationId, customerRelationId: customerId,
       staffId: input.staffId, serviceId: input.serviceId, serviceName: selection.serviceName,
@@ -178,7 +178,7 @@ export async function changeAppointmentService(formData: FormData) {
     )).limit(1);
     if (!current) throw new Error("Appuntamento non trovato.");
     if (!["BOOKED", "CONFIRMED", "ARRIVED"].includes(current.status)) throw new Error("Il servizio può essere cambiato solo su un appuntamento attivo.");
-    const [service] = await tx.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice }).from(services).where(and(
+    const [service] = await tx.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice, repeatPriceEnabled: services.repeatPriceEnabled }).from(services).where(and(
       eq(services.id, input.serviceId), eq(services.businessId, context.businessId), eq(services.active, true),
     )).limit(1);
     if (!service) throw new Error("Servizio non disponibile.");
@@ -187,7 +187,7 @@ export async function changeAppointmentService(formData: FormData) {
       eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, current.customerId),
       eq(appointments.serviceId, service.id), eq(appointments.status, "COMPLETED"), ne(appointments.id, input.id),
     )).limit(1);
-    const servicePrice = previousService && service.repeatPrice != null ? service.repeatPrice : service.price;
+    const servicePrice = previousService && service.repeatPriceEnabled && service.repeatPrice != null ? service.repeatPrice : service.price;
     await tx.update(appointments).set({
       serviceId: service.id,
       serviceName: service.name,
