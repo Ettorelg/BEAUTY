@@ -249,4 +249,20 @@ export async function rejectCustomerRescheduleRequest(formData: FormData) {
   revalidatePath("/app/agenda");
   revalidatePath("/account");
 }
+export async function approveCustomerRescheduleRequestSafely(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await approveCustomerRescheduleRequest(formData);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Impossibile accettare la modifica." };
+  }
+}
 
+export async function rejectCustomerRescheduleRequestSafely(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await rejectCustomerRescheduleRequest(formData);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Impossibile rifiutare la modifica." };
+  }
+}

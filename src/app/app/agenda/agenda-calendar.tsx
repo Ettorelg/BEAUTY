@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
-import { approveCustomerRescheduleRequest, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequest, rescheduleAppointment } from "./actions";
+import { approveCustomerRescheduleRequestSafely, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequestSafely, rescheduleAppointment } from "./actions";
 import { CustomerAutofill } from "./customer-autofill";
 import { AppointmentPriceEditor } from "./appointment-price-editor";
 
@@ -142,6 +142,7 @@ export function AgendaCalendar({ today }: { today: string }) {
   const [completionFor, setCompletionFor] = useState("");
   const [completionNote, setCompletionNote] = useState("");
   const [error, setError] = useState("");
+  const [reschedulePending, setReschedulePending] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -215,6 +216,21 @@ export function AgendaCalendar({ today }: { today: string }) {
     }
   }
 
+  async function decideReschedule(id: string, decision: "approve" | "reject") {
+    const formData = new FormData();
+    formData.set("id", id);
+    setReschedulePending(id);
+    setError("");
+    const result = decision === "approve"
+      ? await approveCustomerRescheduleRequestSafely(formData)
+      : await rejectCustomerRescheduleRequestSafely(formData);
+    setReschedulePending("");
+    if (!result.ok) {
+      setError(result.error ?? "Impossibile gestire la richiesta di modifica.");
+      return;
+    }
+    await load();
+  }
   return <>
     <div className="agenda-toolbar">
       <div className="agenda-navigation">
@@ -233,7 +249,7 @@ export function AgendaCalendar({ today }: { today: string }) {
     </div>
 
     {error ? <p className="agenda-error" role="alert">{error}</p> : null}
-    {data.rescheduleRequests?.length ? <section className="panel"><h2>Richieste di modifica dei clienti</h2>{data.rescheduleRequests.map(request => <article className="data-row" key={request.id}><div><strong>{request.customerName} · {request.serviceName}</strong><p>Propone: {new Date(request.proposedStartsAt).toLocaleString("it-IT", { timeZone: data.timezone })} · {request.proposedStaffName}</p></div><div className="button-row"><form action={approveCustomerRescheduleRequest}><input type="hidden" name="id" value={request.id}/><button className="primary-button">Accetta</button></form><form action={rejectCustomerRescheduleRequest}><input type="hidden" name="id" value={request.id}/><button className="danger-button">Rifiuta</button></form></div></article>)}</section> : null}
+    {data.rescheduleRequests?.length ? <section className="panel"><h2>Richieste di modifica dei clienti</h2>{data.rescheduleRequests.map(request => <article className="data-row" key={request.id}><div><strong>{request.customerName} · {request.serviceName}</strong><p>Propone: {new Date(request.proposedStartsAt).toLocaleString("it-IT", { timeZone: data.timezone })} · {request.proposedStaffName}</p></div><div className="button-row"><button className="primary-button" type="button" disabled={reschedulePending === request.id} onClick={() => void decideReschedule(request.id, "approve")}>{reschedulePending === request.id ? "Verifica…" : "Accetta"}</button><button className="danger-button" type="button" disabled={reschedulePending === request.id} onClick={() => void decideReschedule(request.id, "reject")}>Rifiuta</button></div></article>)}</section> : null}
 
     {data.canManage && showRevenue ? <section className="agenda-revenue-card">
       <div>
@@ -345,3 +361,4 @@ export function AgendaCalendar({ today }: { today: string }) {
     {open ? <Booking data={data} date={date} close={() => setOpen(false)} done={load} /> : null}
   </>;
 }
+
