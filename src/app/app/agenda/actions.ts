@@ -161,6 +161,40 @@ function inArrayValue<T extends readonly string[]>(values: T, value: string): va
   return values.includes(value as T[number]);
 }
 
+export async function changeAppointmentService(formData: FormData) {
+  const context = await requireBusinessContext();
+  if (context.role !== "OWNER") throw new Error("Operazione riservata al titolare.");
+  const input = z.object({ id: z.string().uuid(), serviceId: z.string().uuid() }).parse(Object.fromEntries(formData));
+  await db.transaction(async (tx) => {
+    const [current] = await tx.select({ serviceName: appointments.serviceName, startsAt: appointments.startsAt, status: appointments.status }).from(appointments).where(and(
+      eq(appointments.id, input.id), eq(appointments.businessId, context.businessId),
+    )).limit(1);
+    if (!current) throw new Error("Appuntamento non trovato.");
+    if (!["BOOKED", "CONFIRMED", "ARRIVED"].includes(current.status)) throw new Error("Il servizio può essere cambiato solo su un appuntamento attivo.");
+    const [service] = await tx.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price }).from(services).where(and(
+      eq(services.id, input.serviceId), eq(services.businessId, context.businessId), eq(services.active, true),
+    )).limit(1);
+    if (!service) throw new Error("Servizio non disponibile.");
+    const endsAt = new Date(current.startsAt.getTime() + service.duration * 60_000);
+    await tx.update(appointments).set({
+      serviceId: service.id,
+      serviceName: service.name,
+      durationMinutes: service.duration,
+      price: String(service.price),
+      endsAt,
+      version: sql`${appointments.version} + 1`,
+      updatedAt: new Date(),
+    }).where(eq(appointments.id, input.id));
+    await tx.insert(appointmentEvents).values({
+      appointmentId: input.id,
+      businessId: context.businessId,
+      type: "SERVICE_CHANGED",
+      actorId: context.user.id,
+      note: `${current.serviceName} → ${service.name} · cambio manuale senza controllo orario`,
+    });
+  });
+  revalidatePath("/app/agenda");
+}
 export async function rescheduleAppointment(formData: FormData) {
   const context = await requireBusinessContext();
   const input = z.object({ id: z.string().uuid(), startsAt: z.string().min(16), staffId: z.string().uuid().optional() }).parse(Object.fromEntries(formData));
@@ -270,4 +304,6 @@ export async function rejectCustomerRescheduleRequestSafely(formData: FormData):
     return { ok: false, error: error instanceof Error ? error.message : "Impossibile rifiutare la modifica." };
   }
 }
+
+
 

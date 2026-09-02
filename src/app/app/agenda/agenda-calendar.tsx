@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
-import { approveCustomerRescheduleRequestSafely, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequestSafely, rescheduleAppointment } from "./actions";
+import { approveCustomerRescheduleRequestSafely, changeAppointmentService, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequestSafely, rescheduleAppointment } from "./actions";
 import { CustomerAutofill } from "./customer-autofill";
 import { AppointmentPriceEditor } from "./appointment-price-editor";
 
@@ -332,6 +332,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                 {entry.rememberedNote ? <p className="agenda-remembered-note"><strong>Nota precedente:</strong> {entry.rememberedNote}</p> : null}
                 {data.canManage || !["COMPLETED", "CANCELLED", "NO_SHOW"].includes(entry.status) ? <details className="agenda-reschedule">
                   <summary>Modifica</summary>
+                  {data.canManage && editableStatuses.includes(entry.status) ? <form action={changeAppointmentService} className="compact-form stacked"><input type="hidden" name="id" value={entry.id}/><label>Servizio<select name="serviceId" defaultValue={entry.serviceId}>{data.catalog.filter((option, index, all) => all.findIndex((item) => item.id === option.id) === index).map((option) => <option value={option.id} key={option.id}>{option.name} · {option.duration} min</option>)}</select></label><button className="ghost-button">Cambia servizio senza controllo orario</button></form> : null}
                   <form action={rescheduleAppointment}>
                     <input type="hidden" name="id" value={entry.id} />
                     <input name="startsAt" type="datetime-local" required />
@@ -368,6 +369,7 @@ export function AgendaCalendar({ today }: { today: string }) {
     {open ? <Booking data={data} date={date} close={() => setOpen(false)} done={load} /> : null}
   </>;
 }
+
 
 
 
