@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Alpha Prenota",
-  description: "Gestionale e prenotazioni per professionisti e attività.",
+  description: "Gestionale e prenotazioni per professionisti di ogni settore.",
 };
 
 function SiteFooter() {
