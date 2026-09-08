@@ -1,10 +1,10 @@
 import Link from "next/link";
 
-export const metadata = { title: "Privacy Policy · Alpha Beauty" };
+export const metadata = { title: "Privacy Policy · Alpha Prenota" };
 
 export default function PrivacyPage() {
   return <main className="legal-shell"><article className="card legal-document">
-    <p className="eyebrow">Alpha Beauty</p><h1>Privacy Policy</h1><p className="muted">Ultimo aggiornamento: 31 agosto 2026</p>
+    <p className="eyebrow">Alpha Prenota</p><h1>Privacy Policy</h1><p className="muted">Ultimo aggiornamento: 8 settembre 2026</p>
     <h2>Dati trattati</h2><p>Il servizio tratta dati identificativi e di contatto, informazioni sulle prenotazioni, preferenze, punti Fidelity e dati tecnici necessari alla sicurezza e al funzionamento della piattaforma.</p>
     <h2>Finalità</h2><p>I dati sono utilizzati per creare e gestire l’account, registrare e ricordare gli appuntamenti, gestire Fidelity e promozioni richieste, fornire assistenza e proteggere il servizio da utilizzi impropri.</p>
     <h2>Titolari del trattamento</h2><p>Per i dati relativi al rapporto con il salone, il titolare è il singolo esercente indicato nella pagina pubblica. Alpha System S.r.l. opera come fornitore tecnico della piattaforma nei limiti degli accordi applicabili.</p>
