@@ -26,6 +26,16 @@ function SiteFooter() {
   </footer>;
 }
 
+function ProductBar() {
+  return <header className="product-bar">
+    <Link className="product-bar-brand" href="/" aria-label="Alpha Prenota · Pagina iniziale">
+      <Image src="/icon.png" alt="" width={30} height={30} priority />
+      <span>Alpha Prenota</span>
+    </Link>
+    <span className="product-bar-description">Prenotazioni e gestione attività</span>
+  </header>;
+}
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="it"><body>{children}<SiteFooter /></body></html>;
+  return <html lang="it"><body><ProductBar />{children}<SiteFooter /></body></html>;
 }
