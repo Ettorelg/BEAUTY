@@ -77,6 +77,32 @@ button { cursor: pointer; }
 .social-auth + .auth-form { margin-top: 0; }
 .auth-secondary-link { margin: 20px 0 0; text-align: center; color: #756a65; font-size: .88rem; }
 
+/* Login compatto: l'intero flusso resta visibile in una schermata desktop. */
+.auth-shell { flex: 1; min-height: 0; padding: 14px 0; }
+.auth-card { width: min(410px, calc(100vw - 28px)); padding: 20px 26px; border-radius: 19px; }
+.auth-brand-logo { display: block; width: min(100%, 248px); height: auto; margin: 0 auto 10px; }
+.auth-card h1 { margin: 5px 0; font-size: clamp(1.55rem, 4vw, 2rem); line-height: 1.05; }
+.auth-card > .eyebrow { margin: 8px 0 3px; font-size: .68rem; }
+.auth-card > .muted { margin: 0; font-size: .83rem; line-height: 1.35; }
+.auth-identity-badge { padding: 5px 9px; font-size: .62rem; }
+.auth-role-list { gap: 5px; margin: 9px 0 11px; }
+.auth-role-list span { padding: 4px 7px; font-size: .67rem; }
+.social-auth { gap: 7px; margin-top: 10px; }
+.social-buttons { gap: 7px; }
+.social-button { min-height: 39px; }
+.auth-divider { gap: 8px; font-size: .72rem; }
+.auth-form { gap: 10px; margin-top: 12px; }
+.social-auth + .auth-form { margin-top: 0; }
+.auth-form label { gap: 4px; font-size: .8rem; }
+.auth-form input, .auth-form select { min-height: 40px; padding: 7px 10px; }
+.auth-form .primary-button { min-height: 40px; padding: 8px 14px; }
+.form-footer { font-size: .8rem; }
+.auth-secondary-link { margin-top: 10px; font-size: .78rem; }
+.auth-shell + .site-footer .site-footer-inner { gap: 4px 20px; padding: 8px 0; }
+.auth-shell + .site-footer .site-footer-developer { font-size: .74rem; }
+.auth-shell + .site-footer nav { font-size: .7rem; }
+.auth-shell + .site-footer .site-footer-legal { font-size: .6rem; }
+
 .dashboard-shell { width: min(1120px, calc(100% - 32px)); padding-top: 28px; }
 .app-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 42px; }
 .app-header p { margin: 0 0 4px; font-size: .72rem; }
@@ -391,3 +417,10 @@ button { cursor: pointer; }
   .site-footer-legal { grid-column: 1; }
 }
 
+@media (max-width: 700px), (max-height: 760px) {
+  .auth-shell { padding: 10px 0; }
+  .auth-card { padding: 16px 20px; }
+  .auth-brand-logo { width: min(100%, 220px); margin-bottom: 7px; }
+  .auth-role-list { margin: 7px 0 9px; }
+  .auth-shell + .site-footer .site-footer-inner { padding: 6px 0; }
+}
