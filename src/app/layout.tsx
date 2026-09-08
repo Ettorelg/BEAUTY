@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,6 +11,10 @@ export const metadata: Metadata = {
 function SiteFooter() {
   return <footer className="site-footer">
     <div className="site-footer-inner">
+      <Link className="site-footer-brand" href="/" aria-label="Alpha Prenota · Torna alla pagina iniziale">
+        <Image src="/icon.png" alt="" width={34} height={34}/>
+        <span>Alpha Prenota</span>
+      </Link>
       <p className="site-footer-developer">Programma sviluppato da <a href="https://alphasystemsrl.it/" target="_blank" rel="noreferrer">Alpha System S.r.l.</a></p>
       <nav aria-label="Informazioni legali">
         <a href="https://menu.alphasystemsrl.it/privacy" target="_blank" rel="noreferrer">Privacy</a>

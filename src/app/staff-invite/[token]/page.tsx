@@ -31,7 +31,7 @@ export default async function StaffInvitePage({ params }: { params: Promise<{ to
   const session = await auth.api.getSession({ headers: await headers() });
   const callbackURL = `/staff-invite/${token}`;
 
-  return <main className="auth-shell"><section className="auth-card wide-card"><p className="eyebrow">Invito staff</p><h1>Entra in {invitation.businessName}.</h1><p className="muted">Ciao {invitation.staffName}, completa l’accesso con l’indirizzo {invitation.email}.</p>
+  return <main className="auth-shell"><section className="auth-card wide-card"><p className="eyebrow">Alpha Prenota · Invito staff</p><h1>Entra in {invitation.businessName}.</h1><p className="muted">Ciao {invitation.staffName}, completa l’accesso con l’indirizzo {invitation.email}.</p>
     {session ? session.user.email.toLowerCase() === invitation.email ? <div className="panel"><p>Hai effettuato l’accesso come <strong>{session.user.email}</strong>.</p><form action={acceptStaffInvitation}><input type="hidden" name="token" value={token}/><button className="primary-button">Accetta invito ed entra</button></form></div> : <div className="panel"><p>Sei collegato come <strong>{session.user.email}</strong>. Devi usare {invitation.email}.</p><LogoutButton redirectTo={callbackURL}/></div> : <>
       <SocialAuthButtons appleEnabled={Boolean(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET)} callbackURL={callbackURL} googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)}/>
       <InviteAuthForm email={invitation.email} name={invitation.staffName}/>
@@ -40,5 +40,5 @@ export default async function StaffInvitePage({ params }: { params: Promise<{ to
 }
 
 function InviteMessage({ title, message, link }: { title: string; message: string; link?: string }) {
-  return <main className="auth-shell"><section className="auth-card"><p className="eyebrow">Invito staff</p><h1>{title}</h1><p className="muted">{message}</p>{link ? <Link className="primary-button link-button" href={link}>Vai al gestionale</Link> : null}</section></main>;
+  return <main className="auth-shell"><section className="auth-card"><p className="eyebrow">Alpha Prenota · Invito staff</p><h1>{title}</h1><p className="muted">{message}</p>{link ? <Link className="primary-button link-button" href={link}>Vai al gestionale</Link> : null}</section></main>;
 }

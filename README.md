@@ -1,6 +1,6 @@
-# Beauty SaaS
+# Alpha Prenota
 
-MVP web multi-tenant per saloni e professionisti beauty.
+Piattaforma web multi-tenant per prenotazioni, agenda, clienti e Fidelity, destinata a professionisti di ogni settore.
 
 ## Avvio locale
 

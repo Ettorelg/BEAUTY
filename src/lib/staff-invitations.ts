@@ -37,7 +37,7 @@ async function deliverInvitationEmail({ email, businessName, invitationUrl, idem
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         "Idempotency-Key": idempotencyKey,
-        "User-Agent": "Beauty-SaaS/1.0",
+        "User-Agent": "Alpha-Prenota/1.0",
       },
       body: JSON.stringify({
         from,

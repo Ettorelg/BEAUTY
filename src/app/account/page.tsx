@@ -108,7 +108,7 @@ export default async function CustomerAccountPage() {
   return <main className="customer-account-shell">
     <nav className="customer-top-nav"><span>Area clienti</span><LogoutButton redirectTo="/account/login" /></nav>
     <header className="customer-account-header">
-      <div><p className="eyebrow">Area clienti</p><h1>Ciao, {session.user.name || "benvenuto"}.</h1><p className="muted">Prenotazioni, saloni e premi in un unico posto.</p></div>
+      <div><p className="eyebrow">Alpha Prenota · Area clienti</p><h1>Ciao, {session.user.name || "benvenuto"}.</h1><p className="muted">Prenotazioni, saloni e premi in un unico posto.</p></div>
       {professionalAccess.length ? <div className="button-row"><Link className="ghost-button link-button" href="/app">Accedi come titolare/staff</Link></div> : null}
     </header>
 
