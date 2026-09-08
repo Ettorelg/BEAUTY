@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Alpha Beauty",
-  description: "Gestionale e prenotazioni per professionisti beauty.",
+  title: "Alpha Prenota",
+  description: "Gestionale e prenotazioni per professionisti e attività.",
 };
 
 function SiteFooter() {

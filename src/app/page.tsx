@@ -5,14 +5,18 @@ export default function HomePage() {
   return (
     <main>
       <section className="card">
-        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 18 }}>
-          <Image src="/brand/alpha-beauty-logo.png" alt="Logo Alpha Beauty" width={88} height={88} priority />
-          <div>
-            <p className="eyebrow">Alpha Beauty</p>
-            <h1>Il tuo salone, più semplice.</h1>
-          </div>
+        <div style={{ marginBottom: 24 }}>
+          <Image
+            src="/brand/alpha-prenota-logo-v1.png"
+            alt="Logo Alpha Prenota"
+            width={420}
+            height={140}
+            priority
+            style={{ width: "min(100%, 420px)", height: "auto" }}
+          />
         </div>
-        <p>Prenotazioni, agenda, clienti e Fidelity in un unico spazio pensato per il settore beauty.</p>
+        <h1>I tuoi appuntamenti, più semplici.</h1>
+        <p>Prenotazioni, agenda, clienti e Fidelity in un unico spazio per ogni attività.</p>
         <div className="button-row">
           <Link className="primary-button link-button" href="/account/login">Accesso clienti</Link>
           <Link className="ghost-button link-button" href="/login">Accesso professionisti</Link>
