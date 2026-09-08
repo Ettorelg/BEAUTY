@@ -4,6 +4,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://prenota.alphasystemsrl.it"),
   title: "Alpha Prenota",
   description: "Gestionale e prenotazioni per professionisti di ogni settore.",
 };
