@@ -26,7 +26,7 @@ export default async function AppPage() {
   const context = await requireBusinessContext();
   if (context.role === "STAFF") redirect("/app/agenda");
 
-  const bookingUrl = `${process.env.APP_URL ?? "https://beauty.alphasystemsrl.it"}/s/${context.businessSlug}`;
+  const bookingUrl = `${process.env.APP_URL ?? "https://prenota.alphasystemsrl.it"}/s/${context.businessSlug}`;
   const now = new Date();
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: context.timezone }).format(now);
   const tomorrowDate = new Date(`${today}T12:00:00Z`);
