@@ -3,7 +3,7 @@ import { normalizeBusinessSlug } from "./business-slug";
 
 describe("business slug", () => {
   it("normalizza nome e accenti", () => {
-    expect(normalizeBusinessSlug("  Èlite Beauty Lab  ")).toBe("elite-beauty-lab");
+    expect(normalizeBusinessSlug("  Èlite Wellness Lab  ")).toBe("elite-wellness-lab");
   });
 
   it("elimina punteggiatura ripetuta", () => {

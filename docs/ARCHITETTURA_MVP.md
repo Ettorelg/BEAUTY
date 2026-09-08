@@ -1,8 +1,8 @@
-# Beauty SaaS - Architettura proposta per l'MVP
+# Alpha Prenota - Architettura proposta per l'MVP
 
 Stato: proposta da approvare prima dell'implementazione.
 
-Fonte dei requisiti: `docs/Progetto SaaS Beauty.docx`.
+Fonte dei requisiti: `docs/Progetto SaaS Alpha Prenota.docx`.
 
 ## 1. Obiettivo e confini
 
