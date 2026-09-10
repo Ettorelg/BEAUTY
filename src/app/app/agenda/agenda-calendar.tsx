@@ -145,6 +145,8 @@ export function AgendaCalendar({ today }: { today: string }) {
   const [showRevenue, setShowRevenue] = useState(false);
   const [failureFor, setFailureFor] = useState("");
   const [completionFor, setCompletionFor] = useState("");
+  const [editFor, setEditFor] = useState("");
+  const [productsFor, setProductsFor] = useState("");
   const [completionNote, setCompletionNote] = useState("");
   const [completionPayment, setCompletionPayment] = useState<"PAID" | "UNPAID">("PAID");
   const [error, setError] = useState("");
@@ -333,8 +335,11 @@ export function AgendaCalendar({ today }: { today: string }) {
                 <em>{statusLabels[entry.status]}</em>
                 {entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto con assenza</strong> : null}
                 {entry.rememberedNote ? <p className="agenda-remembered-note"><strong>Nota precedente:</strong> {entry.rememberedNote}</p> : null}
-                {data.canManage || !["COMPLETED", "CANCELLED", "NO_SHOW"].includes(entry.status) ? <details className="agenda-reschedule">
-                  <summary>Modifica</summary>
+                <div className="agenda-action-buttons">
+                  {data.canManage || !["COMPLETED", "CANCELLED", "NO_SHOW"].includes(entry.status) ? <button type="button" className="ghost-button" onClick={()=>{setEditFor(editFor===entry.id?"":entry.id);setProductsFor("");}}>✎ Modifica prenotazione</button>:null}
+                  {data.inventoryEnabled && !["CANCELLED","NO_SHOW"].includes(entry.status)?<button type="button" className="ghost-button" onClick={()=>{setProductsFor(productsFor===entry.id?"":entry.id);setEditFor("");}}>＋ Aggiungi prodotti</button>:null}
+                </div>
+                {editFor===entry.id ? <section className="agenda-action-panel">
                   {data.canManage && editableStatuses.includes(entry.status) ? <form action={changeAppointmentService} className="compact-form stacked"><input type="hidden" name="id" value={entry.id}/><label>Servizio<select name="serviceId" defaultValue={entry.serviceId}>{data.catalog.filter((option, index, all) => all.findIndex((item) => item.id === option.id) === index).map((option) => <option value={option.id} key={option.id}>{option.name} · {option.duration} min</option>)}</select></label><button className="ghost-button">Cambia servizio senza controllo orario</button></form> : null}
                   <form action={rescheduleAppointment}>
                     <input type="hidden" name="id" value={entry.id} />
@@ -345,8 +350,8 @@ export function AgendaCalendar({ today }: { today: string }) {
                     <button className="ghost-button">Invia proposta al cliente</button>
                   </form>
                   {data.canManage ? <AppointmentPriceEditor appointmentId={entry.id} price={entry.price} onSaved={load} /> : null}
-                  {data.inventoryEnabled ? <div className="compact-form stacked"><strong>Articoli della prenotazione</strong>{data.usedProducts.filter(item=>item.appointmentId===entry.id).map((item,index)=><small key={index}>{item.name} × {item.quantity} · {money(Number(item.unitPrice)*item.quantity)}</small>)}{data.inventoryCatalog.length?<form action={async formData=>{await addProductToAppointment(formData);await load();}} className="compact-form"><input type="hidden" name="appointmentId" value={entry.id}/><select name="productId">{data.inventoryCatalog.map(product=><option key={product.id} value={product.id}>{product.name} · disponibili {product.stock}</option>)}</select><input name="quantity" type="number" min="1" defaultValue="1" title="Quantità"/><button className="ghost-button">Aggiungi articolo</button></form>:<small className="muted">Nessun articolo disponibile.</small>}</div>:null}
-                </details> : null}
+                </section> : null}
+                {productsFor===entry.id ? <section className="agenda-action-panel compact-form stacked"><strong>Articoli della prenotazione</strong>{data.usedProducts.filter(item=>item.appointmentId===entry.id).map((item,index)=><small key={index}>{item.name} × {item.quantity} · {money(Number(item.unitPrice)*item.quantity)}</small>)}{data.inventoryCatalog.length?<form action={async formData=>{await addProductToAppointment(formData);await load();}} className="compact-form"><input type="hidden" name="appointmentId" value={entry.id}/><select name="productId">{data.inventoryCatalog.map(product=><option key={product.id} value={product.id}>{product.name} · disponibili {product.stock}</option>)}</select><input name="quantity" type="number" min="1" defaultValue="1" title="Quantità"/><button className="primary-button">Aggiungi alla prenotazione</button></form>:<small className="muted">Nessun articolo disponibile.</small>}</section>:null}
                 {editableStatuses.includes(entry.status) ? <div className="agenda-quick-actions">
                   <button type="button" className="agenda-complete-button" aria-label="Aggiungi note e segna come eseguito" title="Aggiungi note e completa" onClick={() => { setCompletionFor(completionFor === entry.id ? "" : entry.id); setCompletionNote(entry.rememberedNote ?? ""); setCompletionPayment("PAID"); setFailureFor(""); }}>&#10003;</button>
                   {completionFor === entry.id ? <div className="agenda-completion-note">

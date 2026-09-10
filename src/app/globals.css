@@ -295,6 +295,9 @@ button { cursor: pointer; }
 }
 
 .customer-top-nav { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:24px; }
+.agenda-action-buttons { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.agenda-action-buttons button { flex:1 1 150px; font-size:.78rem; }
+.agenda-action-panel { display:grid; gap:10px; margin-top:10px; padding:12px; border:1px solid #ded4ce; border-radius:12px; background:#fff; color:#27211e; }
 .customer-top-nav > span { color:#756a65; font-size:.85rem; font-weight:700; }
 @media(max-width:700px){.customer-top-nav .ghost-button{min-height:42px;padding:9px 11px}.customer-top-nav form{margin-left:auto}}
 
