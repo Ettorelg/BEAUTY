@@ -94,9 +94,9 @@
 .agenda-failure-reasons button { border: 0; border-radius: 6px; padding: 6px 8px; background: #f2ece8; color: #5d4037; font-size: .72rem; font-weight: 800; white-space: nowrap; }
 .agenda-price { width: max-content; margin-top: 3px; padding: 4px 7px; border-radius: 8px; background: #ede3dd; color: #5c4136 !important; font-size: .8rem; font-weight: 900; }
 .agenda-action-buttons { grid-column:1/-1; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin-top:7px; }
-.agenda-action-buttons .ghost-button { min-height:36px; padding:7px 8px; border-color:#cdbbb1; background:#fff; color:#594238; font-size:.72rem; line-height:1.15; }
+.agenda-action-buttons .ghost-button { min-height:38px; padding:5px; border-color:#cdbbb1; background:#fff; color:#594238; font-size:1.12rem; line-height:1; }
 .agenda-action-buttons .ghost-button:hover { border-color:#806052; background:#f8f2ee; }
-.agenda-complete-action,.agenda-failure-action { min-height:36px; border:0; border-radius:9px; padding:7px 8px; color:#fff; font-size:.72rem; font-weight:800; }
+.agenda-complete-action,.agenda-failure-action { min-height:38px; border:0; border-radius:9px; padding:5px; color:#fff; font-size:1.18rem; font-weight:800; line-height:1; }
 .agenda-complete-action { background:#39784b; }
 .agenda-failure-action { background:#8e5953; }
 .agenda-total { position:absolute; top:10px; right:10px; min-width:120px; display:grid; justify-items:end; gap:1px; padding:8px 10px; border-radius:10px; background:#fff; box-shadow:0 3px 12px #38271f1c; }
