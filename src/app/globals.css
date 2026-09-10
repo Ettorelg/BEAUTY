@@ -102,6 +102,15 @@ button { cursor: pointer; }
 .auth-shell + .site-footer .site-footer-developer { font-size: .74rem; }
 .auth-shell + .site-footer nav { font-size: .7rem; }
 .auth-shell + .site-footer .site-footer-legal { font-size: .6rem; }
+.account-connections-shell .auth-card { width: min(520px, calc(100vw - 28px)); }
+.account-connection-panel { display: grid; gap: 14px; margin-top: 20px; }
+.account-connection-status { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e3d9d3; border-radius: 14px; background: #fcfaf9; }
+.account-connection-status.is-linked { border-color: #b8d9bf; background: #f2fbf4; }
+.account-connection-status > .social-mark { flex: 0 0 34px; width: 34px; height: 34px; color: #4285f4; background: white; box-shadow: 0 2px 9px rgb(45 35 30 / 10%); }
+.account-connection-status div { flex: 1; }
+.account-connection-status p { margin: 2px 0 0; color: #756a65; font-size: .78rem; line-height: 1.35; }
+.account-connection-panel > .muted { margin: 0; font-size: .84rem; line-height: 1.45; }
+.account-connection-continue { width: 100%; }
 
 .dashboard-shell { width: min(1120px, calc(100% - 32px)); padding-top: 28px; }
 .app-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 42px; }
