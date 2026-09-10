@@ -6,3 +6,4 @@ export * from "./staff-invitations";
 export * from "./fidelity";
 
 export * from "./reschedule";
+export * from "./inventory";
