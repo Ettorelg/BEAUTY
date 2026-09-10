@@ -1,11 +1,12 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { appointmentRescheduleRequests, appointments, customerRelations, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
+import { appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryProducts, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
 import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
+import { ensureInventorySchema } from "@/lib/ensure-inventory-schema";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, startOfCalendarMonth, startOfCalendarWeek, startOfCalendarYear, type AgendaView } from "@/modules/agenda/domain/calendar";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
   await ensurePaymentSchema();
   await ensureRescheduleSchema();
   const context = await requireBusinessContext();
+  if(context.modules.includes("INVENTORY")) await ensureInventorySchema();
   const isOwner = context.role === "OWNER";
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: context.timezone }).format(new Date());
   const requestedDate = request.nextUrl.searchParams.get("date") ?? today;
@@ -129,9 +131,15 @@ export async function GET(request: NextRequest) {
     )?.notes ?? null,
   }));
 
+  const appointmentIds=rawEntries.map(entry=>entry.id);
+  const [inventoryCatalog,usedProducts]=context.modules.includes("INVENTORY")?await Promise.all([
+    db.select({id:inventoryProducts.id,name:inventoryProducts.name,stock:inventoryProducts.stock,price:inventoryProducts.salePrice}).from(inventoryProducts).where(and(eq(inventoryProducts.businessId,context.businessId),gt(inventoryProducts.stock,0))).orderBy(asc(inventoryProducts.name)),
+    appointmentIds.length?db.select({appointmentId:appointmentProducts.appointmentId,name:inventoryProducts.name,quantity:appointmentProducts.quantity,unitPrice:appointmentProducts.unitPrice}).from(appointmentProducts).innerJoin(inventoryProducts,eq(inventoryProducts.id,appointmentProducts.productId)).where(and(eq(appointmentProducts.businessId,context.businessId),inArray(appointmentProducts.appointmentId,appointmentIds))):Promise.resolve([]),
+  ]):[[],[]];
+
   const rescheduleRequests = await db.select({ id: appointmentRescheduleRequests.id, appointmentId: appointmentRescheduleRequests.appointmentId, proposedStartsAt: appointmentRescheduleRequests.proposedStartsAt, customerName: customerRelations.name, serviceName: appointments.serviceName, currentStaffId: appointments.staffId, proposedStaffId: appointmentRescheduleRequests.proposedStaffId })
     .from(appointmentRescheduleRequests).innerJoin(appointments, eq(appointments.id, appointmentRescheduleRequests.appointmentId)).leftJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId)).where(and(eq(appointmentRescheduleRequests.businessId, context.businessId), eq(appointmentRescheduleRequests.proposerType, "CUSTOMER"), eq(appointmentRescheduleRequests.status, "PENDING"), gt(appointmentRescheduleRequests.expiresAt, new Date()), isOwner ? undefined : eq(appointments.staffId, ownStaff!.id)));
   const staffNames = new Map(staff.map(member => [member.id, member.name]));
-  return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, staff, catalog, entries, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
+  return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, inventoryEnabled: context.modules.includes("INVENTORY"), inventoryCatalog, usedProducts, staff, catalog, entries, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
 }
 

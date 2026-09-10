@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
-import { approveCustomerRescheduleRequestSafely, changeAppointmentService, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequestSafely, rescheduleAppointment } from "./actions";
+import { addProductToAppointment, approveCustomerRescheduleRequestSafely, changeAppointmentService, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequestSafely, rescheduleAppointment } from "./actions";
 import { CustomerAutofill } from "./customer-autofill";
 import { AppointmentPriceEditor } from "./appointment-price-editor";
 
@@ -32,6 +32,9 @@ type Data = {
   canManage: boolean;
   staff: Staff[];
   catalog: Service[];
+  inventoryEnabled: boolean;
+  inventoryCatalog: Array<{id:string;name:string;stock:number;price:string}>;
+  usedProducts: Array<{appointmentId:string;name:string;quantity:number;unitPrice:string}>;
   entries: Entry[];
   rescheduleRequests: Array<{ id:string;appointmentId:string;customerName:string;serviceName:string;proposedStartsAt:string;proposedStaffName:string }>;
 };
@@ -342,6 +345,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                     <button className="ghost-button">Invia proposta al cliente</button>
                   </form>
                   {data.canManage ? <AppointmentPriceEditor appointmentId={entry.id} price={entry.price} onSaved={load} /> : null}
+                  {data.inventoryEnabled ? <div className="compact-form stacked"><strong>Articoli della prenotazione</strong>{data.usedProducts.filter(item=>item.appointmentId===entry.id).map((item,index)=><small key={index}>{item.name} × {item.quantity} · {money(Number(item.unitPrice)*item.quantity)}</small>)}{data.inventoryCatalog.length?<form action={async formData=>{await addProductToAppointment(formData);await load();}} className="compact-form"><input type="hidden" name="appointmentId" value={entry.id}/><select name="productId">{data.inventoryCatalog.map(product=><option key={product.id} value={product.id}>{product.name} · disponibili {product.stock}</option>)}</select><input name="quantity" type="number" min="1" defaultValue="1" title="Quantità"/><button className="ghost-button">Aggiungi articolo</button></form>:<small className="muted">Nessun articolo disponibile.</small>}</div>:null}
                 </details> : null}
                 {editableStatuses.includes(entry.status) ? <div className="agenda-quick-actions">
                   <button type="button" className="agenda-complete-button" aria-label="Aggiungi note e segna come eseguito" title="Aggiungi note e completa" onClick={() => { setCompletionFor(completionFor === entry.id ? "" : entry.id); setCompletionNote(entry.rememberedNote ?? ""); setCompletionPayment("PAID"); setFailureFor(""); }}>&#10003;</button>

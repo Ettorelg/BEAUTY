@@ -18,6 +18,9 @@ import {
   staffAbsences,
   workingHours,
   businesses,
+  appointmentProducts,
+  inventoryMovements,
+  inventoryProducts,
 } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
@@ -29,6 +32,7 @@ import { approveRescheduleRequest, createRescheduleRequest } from "@/lib/resched
 import { isAppointmentStatus } from "@/modules/appointments/domain/status";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 import { calculateEarnedPoints } from "@/modules/fidelity/domain/rewards";
+import { ensureInventorySchema } from "@/lib/ensure-inventory-schema";
 
 const finalStatuses = ["COMPLETED", "CANCELLED", "NO_SHOW"] as const;
 const bookingSchema = z.object({
@@ -317,6 +321,28 @@ export async function rejectCustomerRescheduleRequestSafely(formData: FormData):
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Impossibile rifiutare la modifica." };
   }
+}
+
+export async function addProductToAppointment(formData: FormData) {
+  const context = await requireBusinessContext();
+  if (!context.modules.includes("INVENTORY")) throw new Error("Modulo magazzino non attivo.");
+  await ensureInventorySchema();
+  const input = z.object({ appointmentId: z.string().uuid(), productId: z.string().uuid(), quantity: z.coerce.number().int().positive() }).parse(Object.fromEntries(formData));
+  await db.transaction(async (tx) => {
+    const [appointment] = await tx.select({ id: appointments.id, staffId: appointments.staffId, status: appointments.status }).from(appointments).where(and(eq(appointments.id, input.appointmentId), eq(appointments.businessId, context.businessId))).limit(1);
+    if (!appointment || ["CANCELLED", "NO_SHOW"].includes(appointment.status)) throw new Error("Prenotazione non disponibile.");
+    if (context.role === "STAFF") {
+      const ownStaffId = await staffIdForCurrentUser(context.businessId, context.user.id);
+      if (!ownStaffId || appointment.staffId !== ownStaffId) throw new Error("Puoi gestire solo i tuoi appuntamenti.");
+    }
+    const [product] = await tx.select({ id: inventoryProducts.id, name: inventoryProducts.name, stock: inventoryProducts.stock, price: inventoryProducts.salePrice }).from(inventoryProducts).where(and(eq(inventoryProducts.id, input.productId), eq(inventoryProducts.businessId, context.businessId))).limit(1);
+    if (!product || product.stock < input.quantity) throw new Error("Articolo non disponibile o giacenza insufficiente.");
+    await tx.insert(appointmentProducts).values({ businessId: context.businessId, appointmentId: appointment.id, productId: product.id, quantity: input.quantity, unitPrice: product.price });
+    await tx.update(inventoryProducts).set({ stock: sql`${inventoryProducts.stock} - ${input.quantity}`, updatedAt: new Date() }).where(eq(inventoryProducts.id, product.id));
+    await tx.insert(inventoryMovements).values({ businessId: context.businessId, productId: product.id, quantity: -input.quantity, reason: "PRENOTAZIONE", note: `Prenotazione ${appointment.id}` });
+    await tx.insert(appointmentEvents).values({ appointmentId: appointment.id, businessId: context.businessId, type: "PRODUCT_ADDED", actorId: context.user.id, note: `${product.name} × ${input.quantity}` });
+  });
+  revalidatePath("/app/agenda"); revalidatePath("/app/inventory");
 }
 
 
