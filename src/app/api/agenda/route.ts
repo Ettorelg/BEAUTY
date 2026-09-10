@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
 
   const appointmentIds=rawEntries.map(entry=>entry.id);
   const [inventoryCatalog,usedProducts]=context.modules.includes("INVENTORY")?await Promise.all([
-    db.select({id:inventoryProducts.id,name:inventoryProducts.name,stock:inventoryProducts.stock,price:inventoryProducts.salePrice}).from(inventoryProducts).where(and(eq(inventoryProducts.businessId,context.businessId),gt(inventoryProducts.stock,0))).orderBy(asc(inventoryProducts.name)),
+    db.select({id:inventoryProducts.id,name:inventoryProducts.name,stock:inventoryProducts.stock,price:inventoryProducts.salePrice}).from(inventoryProducts).where(eq(inventoryProducts.businessId,context.businessId)).orderBy(asc(inventoryProducts.name)),
     appointmentIds.length?db.select({appointmentId:appointmentProducts.appointmentId,name:inventoryProducts.name,quantity:appointmentProducts.quantity,unitPrice:appointmentProducts.unitPrice}).from(appointmentProducts).innerJoin(inventoryProducts,eq(inventoryProducts.id,appointmentProducts.productId)).where(and(eq(appointmentProducts.businessId,context.businessId),inArray(appointmentProducts.appointmentId,appointmentIds))):Promise.resolve([]),
   ]):[[],[]];
 
