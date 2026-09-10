@@ -7,6 +7,11 @@ describe("Fidelity rewards", () => {
     expect(calculateEarnedPoints(9.99, 1000, 2)).toBe(0);
   });
 
+  it("assegna punti fissi per servizio o prenotazione completata",()=>{
+    expect(calculateEarnedPoints(5,1000,3,"PER_SERVICE")).toBe(3);
+    expect(calculateEarnedPoints(5,1000,2,"PER_APPOINTMENT")).toBe(2);
+  });
+
   it("permette il riscatto soltanto con punti sufficienti", () => {
     expect(canRedeemReward(10, 10)).toBe(true);
     expect(canRedeemReward(9, 10)).toBe(false);

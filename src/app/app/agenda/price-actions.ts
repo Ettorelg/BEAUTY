@@ -44,8 +44,8 @@ export async function updateAppointmentPrice(formData: FormData): Promise<{ ok: 
       if (current.status === "COMPLETED") {
         const [settings] = await tx.select().from(fidelitySettings).where(eq(fidelitySettings.businessId, context.businessId)).limit(1);
         if (settings) {
-          const previousPoints = calculateEarnedPoints(Number(current.price), settings.spendCents, settings.pointsAward);
-          const nextPoints = calculateEarnedPoints(parsedPrice, settings.spendCents, settings.pointsAward);
+          const previousPoints = calculateEarnedPoints(Number(current.price), settings.spendCents, settings.pointsAward, settings.awardMode as "BY_SPEND"|"PER_SERVICE"|"PER_APPOINTMENT");
+          const nextPoints = calculateEarnedPoints(parsedPrice, settings.spendCents, settings.pointsAward, settings.awardMode as "BY_SPEND"|"PER_SERVICE"|"PER_APPOINTMENT");
           const difference = nextPoints - previousPoints;
           if (difference) {
             await tx

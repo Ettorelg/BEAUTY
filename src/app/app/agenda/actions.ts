@@ -158,7 +158,7 @@ export async function changeAppointmentStatus(formData: FormData) {
     }    if (next === "COMPLETED" && current.status !== "COMPLETED") {
       const [settings] = await tx.select().from(fidelitySettings).where(eq(fidelitySettings.businessId, context.businessId)).limit(1);
       if (settings) {
-        const earned = calculateEarnedPoints(Number(current.price), settings.spendCents, settings.pointsAward);
+        const earned = calculateEarnedPoints(Number(current.price), settings.spendCents, settings.pointsAward, settings.awardMode as "BY_SPEND"|"PER_SERVICE"|"PER_APPOINTMENT");
         const expiresAt = new Date();
         expiresAt.setMonth(expiresAt.getMonth() + settings.pointsValidityMonths);
         await tx.insert(fidelityCards).values({ businessId: context.businessId, customerRelationId: current.customerId, cardNumber: `AB-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, points: earned, pointsExpiresAt: expiresAt })
