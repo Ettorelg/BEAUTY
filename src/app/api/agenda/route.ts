@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryProducts, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
+import { appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryCategories, inventoryCategoryServiceCategories, inventoryCategoryServices, inventoryProducts, inventoryProductServices, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
         endsAt: appointments.endsAt,
         status: appointments.status,
         serviceId: appointments.serviceId,
+        serviceCategoryId: services.categoryId,
         serviceName: appointments.serviceName,
         customerName: customerRelations.name,
         staffId: staffMembers.id,
@@ -83,6 +84,7 @@ export async function GET(request: NextRequest) {
         notes: appointments.notes,
       })
       .from(appointments)
+      .innerJoin(services, and(eq(appointments.serviceId, services.id), eq(services.businessId, context.businessId)))
       .leftJoin(customerRelations, and(eq(appointments.customerRelationId, customerRelations.id), eq(customerRelations.businessId, context.businessId)))
       .innerJoin(staffMembers, and(eq(appointments.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId)))
       .where(
@@ -132,14 +134,19 @@ export async function GET(request: NextRequest) {
   }));
 
   const appointmentIds=rawEntries.map(entry=>entry.id);
-  const [inventoryCatalog,usedProducts]=context.modules.includes("INVENTORY")?await Promise.all([
-    db.select({id:inventoryProducts.id,name:inventoryProducts.name,stock:inventoryProducts.stock,price:inventoryProducts.salePrice}).from(inventoryProducts).where(eq(inventoryProducts.businessId,context.businessId)).orderBy(asc(inventoryProducts.name)),
-    appointmentIds.length?db.select({appointmentId:appointmentProducts.appointmentId,name:inventoryProducts.name,quantity:appointmentProducts.quantity,unitPrice:appointmentProducts.unitPrice}).from(appointmentProducts).innerJoin(inventoryProducts,eq(inventoryProducts.id,appointmentProducts.productId)).where(and(eq(appointmentProducts.businessId,context.businessId),inArray(appointmentProducts.appointmentId,appointmentIds))):Promise.resolve([]),
-  ]):[[],[]];
+  const [inventoryCatalog,usedProducts,directProductLinks,categoryServiceLinks,categoryGroupLinks]=context.modules.includes("INVENTORY")?await Promise.all([
+    db.select({id:inventoryProducts.id,name:inventoryProducts.name,stock:inventoryProducts.stock,price:inventoryProducts.salePrice,categoryId:inventoryProducts.categoryId,categoryName:inventoryCategories.name}).from(inventoryProducts).leftJoin(inventoryCategories,eq(inventoryCategories.id,inventoryProducts.categoryId)).where(eq(inventoryProducts.businessId,context.businessId)).orderBy(asc(inventoryProducts.name)),
+    appointmentIds.length?db.select({appointmentId:appointmentProducts.appointmentId,name:appointmentProducts.description,quantity:appointmentProducts.quantity,unitPrice:appointmentProducts.unitPrice}).from(appointmentProducts).where(and(eq(appointmentProducts.businessId,context.businessId),inArray(appointmentProducts.appointmentId,appointmentIds))):Promise.resolve([]),
+    db.select({productId:inventoryProductServices.productId,serviceId:inventoryProductServices.serviceId}).from(inventoryProductServices).where(eq(inventoryProductServices.businessId,context.businessId)),
+    db.select({categoryId:inventoryCategoryServices.inventoryCategoryId,serviceId:inventoryCategoryServices.serviceId}).from(inventoryCategoryServices).where(eq(inventoryCategoryServices.businessId,context.businessId)),
+    db.select({categoryId:inventoryCategoryServiceCategories.inventoryCategoryId,serviceCategoryId:inventoryCategoryServiceCategories.serviceCategoryId}).from(inventoryCategoryServiceCategories).where(eq(inventoryCategoryServiceCategories.businessId,context.businessId)),
+  ]):[[],[],[],[],[]];
+  const productTotals=new Map<string,number>();for(const item of usedProducts)productTotals.set(item.appointmentId,(productTotals.get(item.appointmentId)??0)+Number(item.unitPrice)*item.quantity);
+  const enrichedEntries=entries.map(entry=>{const categoryIds=new Set([...categoryServiceLinks.filter(link=>link.serviceId===entry.serviceId).map(link=>link.categoryId),...categoryGroupLinks.filter(link=>link.serviceCategoryId===entry.serviceCategoryId).map(link=>link.categoryId)]);return {...entry,productTotal:productTotals.get(entry.id)??0,recommendedProductIds:[...new Set([...directProductLinks.filter(link=>link.serviceId===entry.serviceId).map(link=>link.productId),...inventoryCatalog.filter(product=>product.categoryId&&categoryIds.has(product.categoryId)).map(product=>product.id)])]};});
 
   const rescheduleRequests = await db.select({ id: appointmentRescheduleRequests.id, appointmentId: appointmentRescheduleRequests.appointmentId, proposedStartsAt: appointmentRescheduleRequests.proposedStartsAt, customerName: customerRelations.name, serviceName: appointments.serviceName, currentStaffId: appointments.staffId, proposedStaffId: appointmentRescheduleRequests.proposedStaffId })
     .from(appointmentRescheduleRequests).innerJoin(appointments, eq(appointments.id, appointmentRescheduleRequests.appointmentId)).leftJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId)).where(and(eq(appointmentRescheduleRequests.businessId, context.businessId), eq(appointmentRescheduleRequests.proposerType, "CUSTOMER"), eq(appointmentRescheduleRequests.status, "PENDING"), gt(appointmentRescheduleRequests.expiresAt, new Date()), isOwner ? undefined : eq(appointments.staffId, ownStaff!.id)));
   const staffNames = new Map(staff.map(member => [member.id, member.name]));
-  return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, inventoryEnabled: context.modules.includes("INVENTORY"), inventoryCatalog, usedProducts, staff, catalog, entries, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
+  return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, inventoryEnabled: context.modules.includes("INVENTORY"), inventoryCatalog, usedProducts, staff, catalog, entries:enrichedEntries, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
 }
 

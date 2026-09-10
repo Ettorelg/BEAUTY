@@ -1,5 +1,5 @@
 .legacy-agenda { display: none; }
-.agenda-shell { max-width: 1440px; padding-bottom: 120px; }
+.agenda-shell { width:calc(100% - 24px); max-width:none; padding-top:24px; padding-bottom:120px; }
 .agenda-toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; margin-bottom: 18px; padding: 14px; border: 1px solid #e4ddd8; border-radius: 16px; background: white; }
 .agenda-toolbar h2 { margin: 0; font-family: Georgia, serif; text-align: center; text-transform: capitalize; }
 .agenda-navigation, .agenda-view-switch { display: flex; align-items: center; gap: 8px; }
@@ -14,7 +14,7 @@
 .calendar-row { display: grid; min-height: 64px; }
 .calendar-row time { position: sticky; left: 0; z-index: 2; padding: 10px 12px; border-right: 1px solid #eee7e3; border-bottom: 1px solid #eee7e3; background: #faf8f6; color: #756a65; font-size: .78rem; }
 .calendar-cell { min-width: 0; padding: 5px; border-right: 1px solid #eee7e3; border-bottom: 1px solid #eee7e3; }
-.agenda-appointment { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 10px; row-gap: 5px; margin-bottom: 7px; padding: 11px 12px; border: 1px solid #dccdc5; border-left: 5px solid #806052; border-radius: 13px; background: linear-gradient(145deg,#fff 0%,#f5ece7 100%); box-shadow: 0 3px 10px #3d2d2412; line-height: 1.2; }
+.agenda-appointment { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 10px; row-gap: 5px; margin-bottom: 7px; padding: 13px 145px 13px 13px; border: 1px solid #dccdc5; border-left: 5px solid #806052; border-radius: 13px; background: linear-gradient(145deg,#fff 0%,#f5ece7 100%); box-shadow: 0 3px 10px #3d2d2412; line-height: 1.2; }
 .agenda-appointment:has(.agenda-quick-actions) { padding-right: 64px; }
 .agenda-appointment > span { grid-column: 1; }
 .agenda-appointment > strong { grid-column: 2; min-width: 0; overflow: hidden; color:#2f2521; font-size:.96rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -93,15 +93,28 @@
 .agenda-failure-reasons { position: absolute; z-index: 8; right: 56px; top: 46px; display: flex; gap: 5px; padding: 7px; border: 1px solid #ded4cf; border-radius: 9px; background: white; box-shadow: 0 8px 18px #2b211c2b; }
 .agenda-failure-reasons button { border: 0; border-radius: 6px; padding: 6px 8px; background: #f2ece8; color: #5d4037; font-size: .72rem; font-weight: 800; white-space: nowrap; }
 .agenda-price { width: max-content; margin-top: 3px; padding: 4px 7px; border-radius: 8px; background: #ede3dd; color: #5c4136 !important; font-size: .8rem; font-weight: 900; }
-.agenda-action-buttons { grid-column:1/-1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-top:5px; }
+.agenda-action-buttons { grid-column:1/-1; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin-top:7px; }
 .agenda-action-buttons .ghost-button { min-height:36px; padding:7px 8px; border-color:#cdbbb1; background:#fff; color:#594238; font-size:.72rem; line-height:1.15; }
 .agenda-action-buttons .ghost-button:hover { border-color:#806052; background:#f8f2ee; }
+.agenda-complete-action,.agenda-failure-action { min-height:36px; border:0; border-radius:9px; padding:7px 8px; color:#fff; font-size:.72rem; font-weight:800; }
+.agenda-complete-action { background:#39784b; }
+.agenda-failure-action { background:#8e5953; }
+.agenda-total { position:absolute; top:10px; right:10px; min-width:120px; display:grid; justify-items:end; gap:1px; padding:8px 10px; border-radius:10px; background:#fff; box-shadow:0 3px 12px #38271f1c; }
+.agenda-total span { color:#756a65; font-size:.6rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; }
+.agenda-total strong { color:#5c4136; font-size:1.12rem; }
+.agenda-total small { max-width:120px; color:#756a65; font-size:.57rem; text-align:right; }
 .agenda-action-panel { grid-column:1/-1; display:grid; gap:12px; margin-top:5px; padding:14px; border:1px solid #cfbdb3; border-radius:12px; background:#fff; color:#302824; box-shadow:0 12px 30px #36261e24; }
 .agenda-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:9px; border-bottom:1px solid #eee5e0; }
 .agenda-panel-heading > div { display:grid; gap:2px; }
 .agenda-panel-heading button { width:32px; min-height:32px!important; border:0; border-radius:50%; background:#f2ece8; color:#594238; font-size:1.2rem; }
 .agenda-product-list { display:grid; gap:6px; }
 .agenda-product-list small { display:flex; justify-content:space-between; gap:12px; padding:8px 10px; border-radius:8px; background:#f7f2ef; }
+.agenda-product-preview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.agenda-product-preview button { display:grid; gap:3px; border:1px solid #d9cbc3; border-radius:9px; padding:9px; background:#fffaf7; color:#3e3029; text-align:left; }
+.agenda-product-preview small { color:#756a65; }
+.agenda-products-panel > label { display:grid; gap:6px; color:#5f554f; font-size:.76rem; font-weight:800; }
+.agenda-products-panel > label input { width:100%; min-height:42px; border:1px solid #d8cec8; border-radius:9px; padding:8px 10px; }
+.agenda-inline-panel { position:static!important; grid-column:1/-1; width:auto!important; margin-top:5px; }
 .agenda-stock-empty { display:grid; gap:7px; padding:12px; border-radius:10px; background:#fff4dc; color:#604b28; }
 .agenda-stock-empty p { margin:0; font-size:.76rem; }
 .agenda-stock-empty a { width:100%; text-align:center; }
@@ -119,7 +132,10 @@
   .calendar-row { min-height: 46px; }
   .calendar-row time { padding: 7px 6px; font-size: .7rem; }
   .calendar-cell { padding: 3px; }
-  .agenda-appointment { padding: 6px 7px; font-size: .78rem; }
+  .agenda-appointment { padding: 9px 7px; font-size: .78rem; }
+  .agenda-total { position:static; grid-column:1/-1; justify-items:start; margin:4px 0; }
+  .agenda-total small { max-width:none; text-align:left; }
+  .agenda-action-buttons { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .agenda-appointment:has(.agenda-quick-actions) { padding-right: 64px; }
   .agenda-appointment small { font-size: .68rem; }
   .agenda-appointment .agenda-reschedule { display: block; }

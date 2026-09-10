@@ -337,12 +337,24 @@ export async function addProductToAppointment(formData: FormData) {
     }
     const [product] = await tx.select({ id: inventoryProducts.id, name: inventoryProducts.name, stock: inventoryProducts.stock, price: inventoryProducts.salePrice }).from(inventoryProducts).where(and(eq(inventoryProducts.id, input.productId), eq(inventoryProducts.businessId, context.businessId))).limit(1);
     if (!product || product.stock < input.quantity) throw new Error("Articolo non disponibile o giacenza insufficiente.");
-    await tx.insert(appointmentProducts).values({ businessId: context.businessId, appointmentId: appointment.id, productId: product.id, quantity: input.quantity, unitPrice: product.price });
+    await tx.insert(appointmentProducts).values({ businessId: context.businessId, appointmentId: appointment.id, productId: product.id, description: product.name, quantity: input.quantity, unitPrice: product.price });
     await tx.update(inventoryProducts).set({ stock: sql`${inventoryProducts.stock} - ${input.quantity}`, updatedAt: new Date() }).where(eq(inventoryProducts.id, product.id));
     await tx.insert(inventoryMovements).values({ businessId: context.businessId, productId: product.id, quantity: -input.quantity, reason: "PRENOTAZIONE", note: `Prenotazione ${appointment.id}` });
     await tx.insert(appointmentEvents).values({ appointmentId: appointment.id, businessId: context.businessId, type: "PRODUCT_ADDED", actorId: context.user.id, note: `${product.name} × ${input.quantity}` });
   });
   revalidatePath("/app/agenda"); revalidatePath("/app/inventory");
+}
+
+export async function addCustomProductToAppointment(formData: FormData) {
+  const context = await requireBusinessContext();
+  if (!context.modules.includes("INVENTORY")) throw new Error("Modulo magazzino non attivo.");
+  await ensureInventorySchema();
+  const input = z.object({ appointmentId: z.string().uuid(), description: z.string().trim().min(2).max(120), quantity: z.coerce.number().int().positive(), unitPrice: z.coerce.number().min(0).max(100000) }).parse(Object.fromEntries(formData));
+  const [appointment] = await db.select({ id: appointments.id, staffId: appointments.staffId, status: appointments.status }).from(appointments).where(and(eq(appointments.id, input.appointmentId), eq(appointments.businessId, context.businessId))).limit(1);
+  if (!appointment || ["CANCELLED", "NO_SHOW"].includes(appointment.status)) throw new Error("Prenotazione non disponibile.");
+  if (context.role === "STAFF") { const ownStaffId = await staffIdForCurrentUser(context.businessId, context.user.id); if (!ownStaffId || appointment.staffId !== ownStaffId) throw new Error("Puoi gestire solo i tuoi appuntamenti."); }
+  await db.transaction(async tx=>{await tx.insert(appointmentProducts).values({businessId:context.businessId,appointmentId:appointment.id,productId:null,description:input.description,quantity:input.quantity,unitPrice:input.unitPrice.toFixed(2)});await tx.insert(appointmentEvents).values({appointmentId:appointment.id,businessId:context.businessId,type:"CUSTOM_PRODUCT_ADDED",actorId:context.user.id,note:`${input.description} × ${input.quantity} · € ${input.unitPrice.toFixed(2)}`});});
+  revalidatePath("/app/agenda");
 }
 
 

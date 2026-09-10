@@ -9,4 +9,9 @@ await c.query(`CREATE TABLE IF NOT EXISTS inventory_category_services (id uuid P
 await c.query(`CREATE TABLE IF NOT EXISTS inventory_category_service_categories (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE, inventory_category_id uuid NOT NULL REFERENCES inventory_categories(id) ON DELETE CASCADE, service_category_id uuid NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE, UNIQUE(inventory_category_id,service_category_id))`);
 await c.query(`CREATE TABLE IF NOT EXISTS inventory_movements (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE, product_id uuid NOT NULL REFERENCES inventory_products(id) ON DELETE CASCADE, quantity integer NOT NULL, reason text NOT NULL, note text, created_at timestamptz NOT NULL DEFAULT now())`);
 await c.query(`CREATE TABLE IF NOT EXISTS appointment_products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE, appointment_id uuid NOT NULL REFERENCES appointments(id) ON DELETE CASCADE, product_id uuid NOT NULL REFERENCES inventory_products(id) ON DELETE RESTRICT, quantity integer NOT NULL, unit_price numeric(10,2) NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`);
+await c.query(`ALTER TABLE appointment_products ADD COLUMN IF NOT EXISTS description text`);
+await c.query(`UPDATE appointment_products ap SET description=COALESCE(ap.description,p.name,'Articolo') FROM inventory_products p WHERE ap.product_id=p.id AND ap.description IS NULL`);
+await c.query(`UPDATE appointment_products SET description='Articolo' WHERE description IS NULL`);
+await c.query(`ALTER TABLE appointment_products ALTER COLUMN description SET NOT NULL`);
+await c.query(`ALTER TABLE appointment_products ALTER COLUMN product_id DROP NOT NULL`);
 }finally{await c.end();}})();return ready;}

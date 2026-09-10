@@ -8,5 +8,5 @@ export async function AppNav({businessName,role,agendaAccess=false,staffAccess=f
   const staffOnly=role==="STAFF";
   if(staffOnly&&!agendaAccess&&!staffAccess) redirect("/app/agenda");
   const context=await requireBusinessContext();
-  return <><header className="app-header"><div><p className="eyebrow">{role}</p><strong>{businessName}</strong></div><div className="button-row"><Link className="ghost-button link-button" href="/account/connections?next=/app">Account e Google</Link><Link className="primary-button link-button customer-mode-button" href="/account">Accedi come cliente</Link><LogoutButton/></div></header><nav className="app-nav app-nav-manager" aria-label="Navigazione gestionale"><AppNavLinks staffOnly={staffOnly} modules={context.modules} businessType={context.businessType}/></nav></>;
+  return <><header className="app-header"><div className="app-header-identity"><AppNavLinks staffOnly={staffOnly} modules={context.modules} businessType={context.businessType}/><div><p className="eyebrow">{role}</p><strong>{businessName}</strong></div></div><div className="button-row"><Link className="ghost-button link-button" href="/account/connections?next=/app">Account e Google</Link><Link className="primary-button link-button customer-mode-button" href="/account">Accedi come cliente</Link><LogoutButton/></div></header></>;
 }
