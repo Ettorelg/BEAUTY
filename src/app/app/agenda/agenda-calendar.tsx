@@ -371,10 +371,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                 <em>{statusLabels[entry.status]}</em>
                 {entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto con assenza</strong> : null}
                 {entry.rememberedNote ? <p className="agenda-remembered-note"><strong>Nota precedente:</strong> {entry.rememberedNote}</p> : null}
-                <div className="agenda-action-buttons">
-                  <button type="button" className="ghost-button" aria-label="Apri prenotazione" title="Apri prenotazione" onClick={event=>{event.stopPropagation();setEditFor(entry.id);}}>✎</button>
-                  {editableStatuses.includes(entry.status)?<button type="button" className="agenda-complete-action" aria-label="Chiudi prenotazione" title="Chiudi prenotazione" onClick={event => {event.stopPropagation();setCompletionFor(entry.id);setCompletionNote(entry.rememberedNote ?? "");setCompletionPayment("PAID");setFailureFor("");}}>✓</button>:null}
-                </div>
+                {editableStatuses.includes(entry.status)?<div className="agenda-action-buttons"><button type="button" className="agenda-complete-action" aria-label="Chiudi prenotazione" title="Chiudi prenotazione" onClick={event => {event.stopPropagation();setCompletionFor(entry.id);setCompletionNote(entry.rememberedNote ?? "");setCompletionPayment("PAID");setFailureFor("");}}>✓</button></div>:null}
                 {editFor===entry.id ? <section className="agenda-action-panel agenda-booking-modal" onClick={event=>event.stopPropagation()}><div className="agenda-panel-heading"><div><span className="eyebrow">Prenotazione</span><strong>{entry.customerName} · {entry.serviceName}</strong></div><button type="button" aria-label="Chiudi" onClick={()=>setEditFor("")}>×</button></div>
                   {data.canEditAppointments && editableStatuses.includes(entry.status) ? <details className="agenda-modal-section"><summary>Modifica servizio e durata</summary><EditServiceForm data={data} entry={entry}/></details> : null}
                   <details className="agenda-modal-section"><summary>Sposta data o operatore</summary><form action={rescheduleAppointment}>

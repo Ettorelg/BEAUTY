@@ -105,7 +105,7 @@
 .agenda-failure-reasons { position: absolute; z-index: 8; right: 56px; top: 46px; display: flex; gap: 5px; padding: 7px; border: 1px solid #ded4cf; border-radius: 9px; background: white; box-shadow: 0 8px 18px #2b211c2b; }
 .agenda-failure-reasons button { border: 0; border-radius: 6px; padding: 6px 8px; background: #f2ece8; color: #5d4037; font-size: .72rem; font-weight: 800; white-space: nowrap; }
 .agenda-price { width: max-content; margin-top: 3px; padding: 4px 7px; border-radius: 8px; background: #ede3dd; color: #5c4136 !important; font-size: .8rem; font-weight: 900; }
-.agenda-action-buttons { position:absolute; left:13px; bottom:13px; width:132px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin:0; }
+.agenda-action-buttons { position:absolute; left:13px; bottom:13px; width:54px; display:grid; grid-template-columns:1fr; gap:7px; margin:0; }
 .agenda-action-buttons .ghost-button { min-height:38px; padding:5px; border-color:#cdbbb1; background:#fff; color:#594238; font-size:1.12rem; line-height:1; }
 .agenda-action-buttons .ghost-button:hover { border-color:#806052; background:#f8f2ee; }
 .agenda-complete-action,.agenda-failure-action { min-height:38px; border:0; border-radius:9px; padding:5px; color:#fff; font-size:1.18rem; font-weight:800; line-height:1; }
@@ -161,7 +161,7 @@
   .calendar-cell { padding:4px; }
   .agenda-appointment { padding:10px 9px 62px; column-gap:6px; }
   .agenda-appointment > strong { font-size:.88rem; }
-  .agenda-action-buttons { left:9px; bottom:10px; width:104px; gap:5px; }
+  .agenda-action-buttons { left:9px; bottom:10px; width:46px; gap:5px; }
   .agenda-total { right:8px; bottom:10px; min-width:102px; padding:7px 8px; }
   .agenda-total strong { font-size:1rem; }
   .agenda-booking-modal { width:min(680px,calc(100vw - 24px)); }
@@ -187,8 +187,7 @@
   .agenda-appointment { padding: 9px 7px; font-size: .78rem; }
   .agenda-total { right:7px; bottom:9px; min-width:104px; padding:6px 8px; }
   .agenda-total small { display:none; }
-  .agenda-action-buttons { left:7px; bottom:9px; width:98px; gap:5px; }
-  .agenda-action-buttons { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .agenda-action-buttons { left:7px; bottom:9px; width:44px; gap:5px; grid-template-columns:1fr; }
   .agenda-appointment:has(.agenda-quick-actions) { padding-right: 64px; }
   .agenda-appointment small { font-size: .68rem; }
   .agenda-appointment .agenda-reschedule { display: block; }
