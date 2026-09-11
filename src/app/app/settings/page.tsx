@@ -9,7 +9,7 @@ import { AppNav } from "../app-nav";
 import { LogoutButton } from "../logout-button";
 import { saveBusinessSettings } from "./actions";
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; whatsapp?: string }> }) {
   const context = await requireBusinessContext();
   if (context.role !== "OWNER") redirect("/app/agenda");
   const query = await searchParams;
@@ -18,10 +18,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   return <main className="dashboard-shell"><AppNav businessName={context.businessName} role={context.role}/>
     <section className="page-heading"><div><p className="eyebrow">Personalizzazione</p><h1>Tipo di attività e funzioni</h1></div><p className="muted">Mostra solo gli strumenti utili alla tua attività.</p></section>
     {query.saved ? <p className="success-message">Configurazione salvata.</p> : null}
+    {query.whatsapp === "connected" ? <p className="success-message">Account WhatsApp collegato correttamente.</p> : null}
+    {query.whatsapp === "error" ? <p className="error-message">Collegamento WhatsApp non completato. Riprova o controlla la configurazione Meta.</p> : null}
     <section className="panel"><form action={saveBusinessSettings} className="compact-form stacked">
       <label>Tipo di attività<select name="businessType" defaultValue={context.businessType}>{BUSINESS_TYPES.map(type => <option key={type} value={type}>{BUSINESS_TYPE_LABELS[type]}</option>)}</select></label>
       <fieldset className="compact-form stacked"><legend>Funzioni attive</legend>{OPTIONAL_MODULES.map(module => <label className="checkbox-row" key={module}><input type="checkbox" name={`module_${module}`} defaultChecked={context.modules.includes(module)}/>{MODULE_LABELS[module]}</label>)}</fieldset>
       <details className="service-category"><summary>Collega WhatsApp Business<span>{whatsappConfigured ? "Account collegato" : "Da configurare"}</span></summary><div className="compact-form stacked">
+        {process.env.META_APP_ID && process.env.META_WHATSAPP_CONFIG_ID ? <a className="primary-button link-button" href="/api/integrations/meta/whatsapp/start">Collega WhatsApp con Meta</a> : null}
+        <p className="muted">Il collegamento guidato associa automaticamente il numero aziendale. I campi manuali restano disponibili per assistenza e test.</p>
         <label>ID numero di telefono Meta<input name="whatsappPhoneNumberId" defaultValue={business?.phoneId ?? ""} placeholder="Phone Number ID"/></label>
         <label>Token di accesso<input name="whatsappAccessToken" type="password" autoComplete="new-password" placeholder={business?.hasToken ? "Token già salvato · lascia vuoto per mantenerlo" : "Token permanente Meta"}/></label>
         <label>Template promemoria<input name="whatsappReminderTemplate" defaultValue={business?.template ?? ""} placeholder="promemoria_prenotazione"/></label>
