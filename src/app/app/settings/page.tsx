@@ -7,7 +7,7 @@ import { BUSINESS_TYPES, BUSINESS_TYPE_LABELS, MODULE_LABELS, OPTIONAL_MODULES }
 import { requireBusinessContext } from "@/lib/business-context";
 import { AppNav } from "../app-nav";
 import { LogoutButton } from "../logout-button";
-import { configureWhatsAppTemplates, saveBusinessSettings, sendWhatsAppTest } from "./actions";
+import { saveBusinessSettings, sendWhatsAppTest } from "./actions";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; whatsapp?: string; reason?: string; created?: string }> }) {
   const context = await requireBusinessContext();
@@ -29,19 +29,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <label>Tipo di attività<select name="businessType" defaultValue={context.businessType}>{BUSINESS_TYPES.map(type => <option key={type} value={type}>{BUSINESS_TYPE_LABELS[type]}</option>)}</select></label>
       <fieldset className="compact-form stacked"><legend>Funzioni attive</legend>{OPTIONAL_MODULES.map(module => <label className="checkbox-row" key={module}><input type="checkbox" name={`module_${module}`} defaultChecked={context.modules.includes(module)}/>{MODULE_LABELS[module]}</label>)}</fieldset>
       <details className="service-category"><summary>Collega WhatsApp Business<span>{whatsappConfigured ? "Account collegato" : "Da configurare"}</span></summary><div className="compact-form stacked">
-        {process.env.META_APP_ID && process.env.META_WHATSAPP_CONFIG_ID ? <a className="primary-button link-button" href="/api/integrations/meta/whatsapp/start">{whatsappConfigured ? "Ricollega o cambia numero WhatsApp" : "Collega WhatsApp Business"}</a> : <p className="empty-state">Il collegamento automatico deve essere abilitato dall’amministratore di Alpha Prenota.</p>}
-        {whatsappConfigured ? <p className="success-message">WhatsApp Business è collegato.</p> : <p className="muted">Non devi inserire codici: premi il pulsante, accedi a Meta e scegli il numero WhatsApp Business dell’attività.</p>}
-        {whatsappConfigured ? <button className="ghost-button" formAction={configureWhatsAppTemplates}>Configura messaggi standard</button> : null}
+        {process.env.META_APP_ID && process.env.META_WHATSAPP_CONFIG_ID ? <a className="primary-button link-button" href="/api/integrations/meta/whatsapp/start">{whatsappConfigured ? "Cambia numero WhatsApp" : "Collega WhatsApp"}</a> : <p className="empty-state">Il collegamento automatico deve essere abilitato dall’amministratore di Alpha Prenota.</p>}
+        {whatsappConfigured ? <p className="success-message">WhatsApp è collegato e le notifiche sono attive.</p> : <p className="muted">Premi il pulsante e autorizza Meta. Al ritorno, notifiche e messaggi standard saranno già configurati e attivi.</p>}
         <input type="hidden" name="whatsappPhoneNumberId" value={business?.phoneId ?? ""}/>
         <input type="hidden" name="whatsappReminderTemplate" value={business?.template ?? "promemoria_prenotazione"}/>
         <input type="hidden" name="whatsappTemplateLanguage" value={business?.language ?? "it"}/>
-        <label className="checkbox-row"><input type="checkbox" name="whatsappRemindersEnabled" defaultChecked={business?.whatsappRemindersEnabled ?? false}/> Attiva le notifiche WhatsApp per questa attività</label>
+        {whatsappConfigured ? <label className="checkbox-row"><input type="checkbox" name="whatsappRemindersEnabled" defaultChecked={business?.whatsappRemindersEnabled ?? false}/> Notifiche WhatsApp attive</label> : null}
         <p className="muted">WhatsApp affianca automaticamente l’email per conferme, promemoria, modifiche, assenze, promozioni e lista d’attesa.</p>
-        <details className="technical-settings"><summary>Assistenza tecnica</summary><div className="compact-form stacked">
-          <p className="muted">Questi dati servono soltanto all’assistenza Alpha Prenota. Il titolare normalmente non deve modificarli.</p>
-          <label>ID numero Meta<input name="technicalWhatsappPhoneNumberId" defaultValue={business?.phoneId ?? ""} readOnly/></label>
-          <label>Nuovo token Meta<input name="whatsappAccessToken" type="password" autoComplete="new-password" placeholder={business?.hasToken ? "Token protetto già presente" : "Solo per configurazione manuale"}/></label>
-        </div></details>
         {!process.env.WHATSAPP_CREDENTIALS_KEY ? <p className="empty-state">L’amministratore deve configurare WHATSAPP_CREDENTIALS_KEY su Railway.</p> : null}
       </div></details>
       <p className="muted">Agenda, servizi, clienti e profilo attività restano sempre disponibili.</p><button className="primary-button">Salva configurazione</button>

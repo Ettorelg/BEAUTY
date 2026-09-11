@@ -704,4 +704,3 @@ body:has(.agenda-shell) > .site-footer { display:none; }
   .landing-feature-grid article { min-height: 0; }
   .landing-access-grid h3, .landing-access-grid p { min-height: 0; }
 }
-.technical-settings{border-top:1px solid #e4ddd8;padding-top:10px}.technical-settings>summary{cursor:pointer;color:#756a65;font-size:.82rem;font-weight:700}.technical-settings>div{margin-top:12px}

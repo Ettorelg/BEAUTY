@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
     whatsappAccessTokenEncrypted: encryptWhatsAppToken(tokenData.access_token),
     whatsappReminderTemplate: "promemoria_prenotazione",
     whatsappTemplateLanguage: "it",
+    whatsappRemindersEnabled: true,
     updatedAt: new Date(),
   }).where(eq(businesses.id, membership.businessId));
   if (info.wabaId) {
