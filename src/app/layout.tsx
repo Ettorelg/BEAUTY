@@ -9,7 +9,11 @@ export const metadata: Metadata = {
   description: "Gestionale e prenotazioni per professionisti di ogni settore.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Alpha Prenota" },
-  icons: { apple: "/pwa/icon-192.png" },
+  icons: {
+    icon: [{ url: "/icon.png?v=2", type: "image/png", sizes: "512x512" }],
+    shortcut: ["/icon.png?v=2"],
+    apple: [{ url: "/pwa/icon-192.png?v=2", type: "image/png", sizes: "192x192" }],
+  },
   other: { "facebook-domain-verification": "45ojxvyavx8k0nnaypp7s5bej94r01" },
 };
 
