@@ -1,11 +1,163 @@
-import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { appointments, customerRelations } from "./booking";
 import { services } from "./catalog";
 import { businesses } from "./tenancy";
 
-export const fidelitySettings=pgTable("fidelity_settings",{businessId:uuid("business_id").primaryKey().references(()=>businesses.id,{onDelete:"cascade"}),awardMode:text("award_mode").notNull().default("BY_SPEND"),spendCents:integer("spend_cents").notNull().default(1000),pointsAward:integer("points_award").notNull().default(1),pointsValidityMonths:integer("points_validity_months").notNull().default(12),allowRewardStacking:boolean("allow_reward_stacking").notNull().default(false),rewardPoints:integer("reward_points").notNull().default(10),rewardType:text("reward_type").notNull().default("DISCOUNT_EUR"),rewardValue:integer("reward_value").notNull().default(500),rewardServiceId:uuid("reward_service_id").references(()=>services.id,{onDelete:"set null"}),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow()});
-export const fidelityCards=pgTable("fidelity_cards",{id:uuid("id").primaryKey().defaultRandom(),businessId:uuid("business_id").notNull().references(()=>businesses.id,{onDelete:"cascade"}),customerRelationId:uuid("customer_relation_id").notNull().references(()=>customerRelations.id,{onDelete:"cascade"}),cardNumber:text("card_number").notNull(),points:integer("points").notNull().default(0),pointsExpiresAt:timestamp("points_expires_at",{withTimezone:true}),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow()},t=>[uniqueIndex("fidelity_cards_business_customer_unique").on(t.businessId,t.customerRelationId),uniqueIndex("fidelity_cards_number_unique").on(t.cardNumber),index("fidelity_cards_business_idx").on(t.businessId)]);
-export const fidelityRules=pgTable("fidelity_rules",{id:uuid("id").primaryKey().defaultRandom(),businessId:uuid("business_id").notNull().references(()=>businesses.id,{onDelete:"cascade"}),points:integer("points").notNull(),type:text("type").notNull(),value:integer("value").notNull().default(0),serviceId:uuid("service_id").references(()=>services.id,{onDelete:"set null"}),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow()},t=>[index("fidelity_rules_business_idx").on(t.businessId)]);
-export const fidelityPromotions=pgTable("fidelity_promotions",{id:uuid("id").primaryKey().defaultRandom(),businessId:uuid("business_id").notNull().references(()=>businesses.id,{onDelete:"cascade"}),serviceId:uuid("service_id").notNull().references(()=>services.id,{onDelete:"cascade"}),discountPercent:integer("discount_percent").notNull(),startsAt:timestamp("starts_at",{withTimezone:true}).notNull(),endsAt:timestamp("ends_at",{withTimezone:true}).notNull(),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow()},t=>[index("fidelity_promotions_business_idx").on(t.businessId)]);
+export const fidelitySettings = pgTable("fidelity_settings", {
+  businessId: uuid("business_id")
+    .primaryKey()
+    .references(() => businesses.id, { onDelete: "cascade" }),
+  awardMode: text("award_mode").notNull().default("BY_SPEND"),
+  spendCents: integer("spend_cents").notNull().default(1000),
+  pointsAward: integer("points_award").notNull().default(1),
+  pointsValidityMonths: integer("points_validity_months").notNull().default(12),
+  allowRewardStacking: boolean("allow_reward_stacking")
+    .notNull()
+    .default(false),
+  rewardPoints: integer("reward_points").notNull().default(10),
+  rewardType: text("reward_type").notNull().default("DISCOUNT_EUR"),
+  rewardValue: integer("reward_value").notNull().default(500),
+  rewardServiceId: uuid("reward_service_id").references(() => services.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const fidelityCards = pgTable(
+  "fidelity_cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    customerRelationId: uuid("customer_relation_id")
+      .notNull()
+      .references(() => customerRelations.id, { onDelete: "cascade" }),
+    cardNumber: text("card_number").notNull(),
+    points: integer("points").notNull().default(0),
+    pointsExpiresAt: timestamp("points_expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("fidelity_cards_business_customer_unique").on(
+      t.businessId,
+      t.customerRelationId,
+    ),
+    uniqueIndex("fidelity_cards_number_unique").on(t.cardNumber),
+    index("fidelity_cards_business_idx").on(t.businessId),
+  ],
+);
+export const fidelityRules = pgTable(
+  "fidelity_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    points: integer("points").notNull(),
+    type: text("type").notNull(),
+    value: integer("value").notNull().default(0),
+    serviceId: uuid("service_id").references(() => services.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("fidelity_rules_business_idx").on(t.businessId)],
+);
+export const fidelityPromotions = pgTable(
+  "fidelity_promotions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+    discountPercent: integer("discount_percent").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("fidelity_promotions_business_idx").on(t.businessId)],
+);
+export const promotionBroadcasts = pgTable(
+  "promotion_broadcasts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    promotionId: uuid("promotion_id").references(() => fidelityPromotions.id, {
+      onDelete: "set null",
+    }),
+    status: text("status").notNull().default("SENDING"),
+    recipientCount: integer("recipient_count").notNull().default(0),
+    successCount: integer("success_count").notNull().default(0),
+    failureCount: integer("failure_count").notNull().default(0),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("promotion_broadcasts_business_idx").on(t.businessId)],
+);
 
-export const fidelityRedemptions=pgTable("fidelity_redemptions",{id:uuid("id").primaryKey().defaultRandom(),businessId:uuid("business_id").notNull().references(()=>businesses.id,{onDelete:"cascade"}),customerRelationId:uuid("customer_relation_id").notNull().references(()=>customerRelations.id,{onDelete:"cascade"}),ruleId:uuid("rule_id").references(()=>fidelityRules.id,{onDelete:"set null"}),appointmentId:uuid("appointment_id").references(()=>appointments.id,{onDelete:"set null"}),pointsSpent:integer("points_spent").notNull(),rewardType:text("reward_type").notNull(),rewardValue:integer("reward_value").notNull().default(0),serviceId:uuid("service_id").references(()=>services.id,{onDelete:"set null"}),reversedAt:timestamp("reversed_at",{withTimezone:true}),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow()},t=>[index("fidelity_redemptions_business_customer_idx").on(t.businessId,t.customerRelationId),uniqueIndex("fidelity_redemptions_appointment_unique").on(t.appointmentId)]);
+export const fidelityRedemptions = pgTable(
+  "fidelity_redemptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    customerRelationId: uuid("customer_relation_id")
+      .notNull()
+      .references(() => customerRelations.id, { onDelete: "cascade" }),
+    ruleId: uuid("rule_id").references(() => fidelityRules.id, {
+      onDelete: "set null",
+    }),
+    appointmentId: uuid("appointment_id").references(() => appointments.id, {
+      onDelete: "set null",
+    }),
+    pointsSpent: integer("points_spent").notNull(),
+    rewardType: text("reward_type").notNull(),
+    rewardValue: integer("reward_value").notNull().default(0),
+    serviceId: uuid("service_id").references(() => services.id, {
+      onDelete: "set null",
+    }),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("fidelity_redemptions_business_customer_idx").on(
+      t.businessId,
+      t.customerRelationId,
+    ),
+    uniqueIndex("fidelity_redemptions_appointment_unique").on(t.appointmentId),
+  ],
+);

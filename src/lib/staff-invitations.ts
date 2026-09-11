@@ -14,19 +14,34 @@ export function isStaffEmailConfigured() {
 }
 
 function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  })[character] ?? character);
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      })[character] ?? character,
+  );
 }
 
-async function deliverInvitationEmail({ email, businessName, invitationUrl, idempotencyKey }: { email: string; businessName: string; invitationUrl: string; idempotencyKey: string }) {
+async function deliverInvitationEmail({
+  email,
+  businessName,
+  invitationUrl,
+  idempotencyKey,
+}: {
+  email: string;
+  businessName: string;
+  invitationUrl: string;
+  idempotencyKey: string;
+}) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return { sent: false, error: "Servizio email non configurato su Railway." };
+  if (!apiKey || !from)
+    return { sent: false, error: "Servizio email non configurato su Railway." };
 
   try {
     const safeBusinessName = escapeHtml(businessName);
@@ -49,28 +64,93 @@ async function deliverInvitationEmail({ email, businessName, invitationUrl, idem
     });
     if (response.ok) return { sent: true, error: null };
     const details = (await response.text()).slice(0, 300);
-    return { sent: false, error: `Invio email non riuscito (${response.status}): ${details}` };
+    return {
+      sent: false,
+      error: `Invio email non riuscito (${response.status}): ${details}`,
+    };
   } catch (error) {
-    return { sent: false, error: error instanceof Error ? error.message.slice(0, 300) : "Invio email non riuscito." };
+    return {
+      sent: false,
+      error:
+        error instanceof Error
+          ? error.message.slice(0, 300)
+          : "Invio email non riuscito.",
+    };
   }
 }
 
-export async function issueStaffInvitation({ businessId, businessName, staffId, email, createdBy }: { businessId: string; businessName: string; staffId: string; email: string; createdBy: string }) {
+export async function issueStaffInvitation({
+  businessId,
+  businessName,
+  staffId,
+  email,
+  createdBy,
+}: {
+  businessId: string;
+  businessName: string;
+  staffId: string;
+  email: string;
+  createdBy: string;
+}) {
   const normalizedEmail = email.trim().toLowerCase();
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hashStaffInvitationToken(token);
   const expiresAt = new Date(Date.now() + invitationLifetimeMs);
-  await db.delete(staffInvitations).where(and(eq(staffInvitations.businessId, businessId), eq(staffInvitations.email, normalizedEmail), ne(staffInvitations.staffId, staffId)));
-  const [existing] = await db.select({ id: staffInvitations.id }).from(staffInvitations)
-    .where(and(eq(staffInvitations.businessId, businessId), eq(staffInvitations.email, normalizedEmail))).limit(1);
+  await db
+    .delete(staffInvitations)
+    .where(
+      and(
+        eq(staffInvitations.businessId, businessId),
+        eq(staffInvitations.email, normalizedEmail),
+        ne(staffInvitations.staffId, staffId),
+      ),
+    );
+  const [existing] = await db
+    .select({ id: staffInvitations.id })
+    .from(staffInvitations)
+    .where(
+      and(
+        eq(staffInvitations.businessId, businessId),
+        eq(staffInvitations.email, normalizedEmail),
+      ),
+    )
+    .limit(1);
   let invitation: { id: string } | undefined;
   if (existing) {
-    [invitation] = await db.update(staffInvitations).set({ staffId, email: normalizedEmail, tokenHash, expiresAt, sentAt: null, acceptedAt: null, lastError: null, createdBy, updatedAt: new Date() }).where(eq(staffInvitations.id, existing.id)).returning({ id: staffInvitations.id });
+    [invitation] = await db
+      .update(staffInvitations)
+      .set({
+        staffId,
+        email: normalizedEmail,
+        tokenHash,
+        expiresAt,
+        sentAt: null,
+        acceptedAt: null,
+        lastError: null,
+        createdBy,
+        updatedAt: new Date(),
+      })
+      .where(eq(staffInvitations.id, existing.id))
+      .returning({ id: staffInvitations.id });
   } else {
-    [invitation] = await db.insert(staffInvitations).values({ businessId, staffId, email: normalizedEmail, tokenHash, expiresAt, createdBy }).returning({ id: staffInvitations.id });
+    [invitation] = await db
+      .insert(staffInvitations)
+      .values({
+        businessId,
+        staffId,
+        email: normalizedEmail,
+        tokenHash,
+        expiresAt,
+        createdBy,
+      })
+      .returning({ id: staffInvitations.id });
   }
 
-  const baseUrl = (process.env.BETTER_AUTH_URL ?? process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const baseUrl = (
+    process.env.BETTER_AUTH_URL ??
+    process.env.APP_URL ??
+    "http://localhost:3000"
+  ).replace(/\/$/, "");
   const invitationUrl = `${baseUrl}/staff-invite/${token}`;
   const delivery = await deliverInvitationEmail({
     email: normalizedEmail,
@@ -78,30 +158,200 @@ export async function issueStaffInvitation({ businessId, businessName, staffId, 
     invitationUrl,
     idempotencyKey: `staff-invite-${invitation.id}-${tokenHash.slice(0, 12)}`,
   });
-  await db.update(staffInvitations).set({ sentAt: delivery.sent ? new Date() : null, lastError: delivery.error, updatedAt: new Date() })
+  await db
+    .update(staffInvitations)
+    .set({
+      sentAt: delivery.sent ? new Date() : null,
+      lastError: delivery.error,
+      updatedAt: new Date(),
+    })
     .where(eq(staffInvitations.id, invitation.id));
   return delivery;
 }
 
-export async function sendBookingConfirmation({email,businessName,serviceName,startsAt,timezone,address,phone}:{email:string;businessName:string;serviceName:string;startsAt:Date;timezone:string;address?:string|null;phone?:string|null}) { const apiKey=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM_EMAIL; if(!apiKey||!from)return; const when=startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:timezone}); const contacts=[address,phone].filter(Boolean).join(" · "); await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify({from,to:[email],subject:`Conferma prenotazione · ${businessName}`,html:`<p>La tua prenotazione è confermata.</p><p><strong>${businessName}</strong><br/>${serviceName}<br/>${when}</p>${contacts?`<p><strong>Contatti attività</strong><br/>${escapeHtml(contacts)}</p>`:""}`})}); }
-export async function sendAbsenceConflictNotification({ email, businessName, serviceName, startsAt, timezone, appointmentId }: { email: string; businessName: string; serviceName: string; startsAt: Date; timezone: string; appointmentId: string }) {
+export async function sendBookingConfirmation({
+  email,
+  businessName,
+  serviceName,
+  startsAt,
+  timezone,
+  address,
+  phone,
+}: {
+  email: string;
+  businessName: string;
+  serviceName: string;
+  startsAt: Date;
+  timezone: string;
+  address?: string | null;
+  phone?: string | null;
+}) {
+  const apiKey = process.env.RESEND_API_KEY,
+    from = process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !from) return;
+  const when = startsAt.toLocaleString("it-IT", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: timezone,
+  });
+  const contacts = [address, phone].filter(Boolean).join(" · ");
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject: `Conferma prenotazione · ${businessName}`,
+      html: `<p>La tua prenotazione è confermata.</p><p><strong>${businessName}</strong><br/>${serviceName}<br/>${when}</p>${contacts ? `<p><strong>Contatti attività</strong><br/>${escapeHtml(contacts)}</p>` : ""}`,
+    }),
+  });
+}
+export async function sendAbsenceConflictNotification({
+  email,
+  businessName,
+  serviceName,
+  startsAt,
+  timezone,
+  appointmentId,
+}: {
+  email: string;
+  businessName: string;
+  serviceName: string;
+  startsAt: Date;
+  timezone: string;
+  appointmentId: string;
+}) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   if (!apiKey || !from) return false;
-  const when = startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: timezone });
+  const when = startsAt.toLocaleString("it-IT", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: timezone,
+  });
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `absence-conflict-${appointmentId}-${startsAt.getTime()}` },
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": `absence-conflict-${appointmentId}-${startsAt.getTime()}`,
+    },
     body: JSON.stringify({
-      from, to: [email], subject: `Aggiornamento prenotazione · ${businessName}`,
+      from,
+      to: [email],
+      subject: `Aggiornamento prenotazione · ${businessName}`,
       html: `<p>È sopraggiunta un’indisponibilità dell’operatore per la tua prenotazione.</p><p><strong>${escapeHtml(businessName)}</strong><br/>${escapeHtml(serviceName)}<br/>${escapeHtml(when)}</p><p>Il salone ti contatterà per concordare un nuovo orario. La prenotazione non è stata cancellata automaticamente.</p>`,
       text: `È sopraggiunta un’indisponibilità dell’operatore per ${serviceName} presso ${businessName}, previsto ${when}. Il salone ti contatterà per concordare un nuovo orario. La prenotazione non è stata cancellata automaticamente.`,
     }),
   });
   return response.ok;
 }
-export async function sendRescheduleApprovalEmail({ email, businessName, serviceName, startsAt, timezone, token }: { email:string;businessName:string;serviceName:string;startsAt:Date;timezone:string;token:string }) {
-  const apiKey=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM_EMAIL;if(!apiKey||!from)return false;
-  const base=(process.env.BETTER_AUTH_URL??process.env.APP_URL??"http://localhost:3000").replace(/\/$/,"");const url=`${base}/reschedule-request/${token}`,when=startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:timezone});
-  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":`reschedule-${token.slice(0,16)}`},body:JSON.stringify({from,to:[email],subject:`Richiesta modifica appuntamento · ${businessName}`,html:`<p>${escapeHtml(businessName)} propone di spostare <strong>${escapeHtml(serviceName)}</strong> al ${escapeHtml(when)}.</p><p><a href="${escapeHtml(url)}">Accetta o rifiuta la proposta</a></p><p>L’appuntamento attuale resta invariato finché non accetti.</p>`,text:`${businessName} propone di spostare ${serviceName} al ${when}. Accetta o rifiuta: ${url}. L’appuntamento attuale resta invariato finché non accetti.`})});return response.ok;
+export async function sendRescheduleApprovalEmail({
+  email,
+  businessName,
+  serviceName,
+  startsAt,
+  timezone,
+  token,
+}: {
+  email: string;
+  businessName: string;
+  serviceName: string;
+  startsAt: Date;
+  timezone: string;
+  token: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY,
+    from = process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !from) return false;
+  const base = (
+    process.env.BETTER_AUTH_URL ??
+    process.env.APP_URL ??
+    "http://localhost:3000"
+  ).replace(/\/$/, "");
+  const url = `${base}/reschedule-request/${token}`,
+    when = startsAt.toLocaleString("it-IT", {
+      dateStyle: "long",
+      timeStyle: "short",
+      timeZone: timezone,
+    });
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": `reschedule-${token.slice(0, 16)}`,
+    },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject: `Richiesta modifica appuntamento · ${businessName}`,
+      html: `<p>${escapeHtml(businessName)} propone di spostare <strong>${escapeHtml(serviceName)}</strong> al ${escapeHtml(when)}.</p><p><a href="${escapeHtml(url)}">Accetta o rifiuta la proposta</a></p><p>L’appuntamento attuale resta invariato finché non accetti.</p>`,
+      text: `${businessName} propone di spostare ${serviceName} al ${when}. Accetta o rifiuta: ${url}. L’appuntamento attuale resta invariato finché non accetti.`,
+    }),
+  });
+  return response.ok;
+}
+
+export async function sendPromotionEmail({
+  email,
+  businessName,
+  serviceName,
+  discountPercent,
+  startsAt,
+  endsAt,
+  timezone,
+  promotionId,
+}: {
+  email: string;
+  businessName: string;
+  serviceName: string;
+  discountPercent: number;
+  startsAt: Date;
+  endsAt: Date;
+  timezone: string;
+  promotionId: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY,
+    from = process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !from)
+    return { sent: false, error: "Servizio email non configurato su Railway." };
+  const start = startsAt.toLocaleString("it-IT", {
+      dateStyle: "long",
+      timeStyle: "short",
+      timeZone: timezone,
+    }),
+    end = endsAt.toLocaleString("it-IT", {
+      dateStyle: "long",
+      timeStyle: "short",
+      timeZone: timezone,
+    });
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `promotion-${promotionId}-${createHash("sha256").update(email).digest("hex").slice(0, 16)}`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: `${discountPercent}% di sconto su ${serviceName} · ${businessName}`,
+        html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#201c1a"><h1>Una promozione per te</h1><p><strong>${escapeHtml(businessName)}</strong> ti offre il <strong>${discountPercent}% di sconto</strong> su ${escapeHtml(serviceName)}.</p><p>Valida dal ${escapeHtml(start)} al ${escapeHtml(end)}.</p></div>`,
+        text: `${businessName}: ${discountPercent}% di sconto su ${serviceName}. Valida dal ${start} al ${end}.`,
+      }),
+    });
+    return response.ok
+      ? { sent: true, error: null }
+      : { sent: false, error: `Invio non riuscito (${response.status})` };
+  } catch (error) {
+    return {
+      sent: false,
+      error: error instanceof Error ? error.message : "Invio non riuscito.",
+    };
+  }
 }
