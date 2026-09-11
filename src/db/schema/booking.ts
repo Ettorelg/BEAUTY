@@ -1,4 +1,4 @@
-import { index, integer, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./identity";
 import { services, staffMembers } from "./catalog";
 import { businesses, locations } from "./tenancy";
@@ -97,6 +97,7 @@ export const serviceWaitlist = pgTable("service_waitlist", {
   customerRelationId: uuid("customer_relation_id").references(() => customerRelations.id, { onDelete: "set null" }),
   customerName: text("customer_name").notNull(), email: text("email").notNull(), phone: text("phone"),
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(), status: text("status").notNull().default("WAITING"),
+  requestedDay: text("requested_day"), anyStaff: boolean("any_staff").notNull().default(false),
   offerTokenHash: text("offer_token_hash"), offerExpiresAt: timestamp("offer_expires_at", { withTimezone: true }), offeredAt: timestamp("offered_at", { withTimezone: true }), confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [index("service_waitlist_slot_idx").on(table.businessId, table.serviceId, table.staffId, table.startsAt, table.status, table.createdAt)]);

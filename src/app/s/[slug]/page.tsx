@@ -23,7 +23,7 @@ import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema"
 import { LogoutButton } from "@/app/app/logout-button";
 import { getPublicAvailability } from "@/modules/availability/application/public-availability";
 import { createPublicAppointment } from "./actions";
-import { joinServiceWaitlist } from "./actions";
+import { joinDayWaitlist, joinServiceWaitlist } from "./actions";
 import { BookingDetailsForm } from "./booking-details-form";
 import { BookingFilters } from "./booking-filters";
 import { describePointAward } from "@/modules/fidelity/domain/rewards";
@@ -223,7 +223,7 @@ export default async function Page({
       })
     : [];
   if (staffId) slots = slots.filter((x) => x.staffId === staffId);
-  if (service && !slots.length && !(service.capacity>1&&service.waitlistEnabled))
+  if (service && !slots.length && !service.waitlistEnabled)
     for (let i = 1; i <= 30 && !slots.length; i++) {
       const candidate = after(date, i);
       let found = await getPublicAvailability({
@@ -482,6 +482,7 @@ export default async function Page({
               </p>
             )}
             {q.waitlist?<p className="success-message">Iscrizione alla lista d’attesa registrata. Riceverai un’email se si libera un posto.</p>:null}
+            {service.waitlistEnabled && !compact.length ? <details className="service-category waitlist-panel" open><summary>Lista d’attesa per la giornata<span>{date}</span></summary><form action={joinDayWaitlist} className="compact-form stacked panel"><input type="hidden" name="slug" value={slug}/><input type="hidden" name="serviceId" value={service.id}/><input type="hidden" name="date" value={date}/><input type="hidden" name="staffId" value={staffId ?? ""}/><p>Nessun orario disponibile. Iscriviti e riceverai automaticamente un’email appena si libera un posto{staffId ? " con l’operatore scelto" : " con qualsiasi operatore"}.</p><input name="customerName" defaultValue={session?.user.name??""} placeholder="Nome e cognome" required/><input name="email" type="email" defaultValue={session?.user.email??""} placeholder="Email" required/><input name="phone" defaultValue={profile?.phone??""} placeholder="Telefono" required/><button className="primary-button">Avvisami se si libera un posto</button></form></details> : null}
             {service.waitlistEnabled&&fullCourseSlots.length?<details className="service-category waitlist-panel"><summary>Iscriviti alla lista d’attesa<span>{fullCourseSlots.length} orari completi</span></summary><div className="service-grid">{fullCourseSlots.map(slot=><form action={joinServiceWaitlist} className="compact-form stacked panel" key={`${slot.staffId}-${slot.startsAt.toISOString()}`}><input type="hidden" name="slug" value={slug}/><input type="hidden" name="serviceId" value={service.id}/><input type="hidden" name="staffId" value={slot.staffId}/><input type="hidden" name="startsAt" value={slot.startsAt.toLocaleString("sv-SE",{timeZone:b.timezone}).replace(" ","T").slice(0,16)}/><strong>{slot.startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:b.timezone})} · {slot.staffName}</strong><input name="customerName" defaultValue={session?.user.name??""} placeholder="Nome e cognome" required/><input name="email" type="email" defaultValue={session?.user.email??""} placeholder="Email" required/><input name="phone" defaultValue={profile?.phone??""} placeholder="Telefono" required/><button className="primary-button">Entra in lista d’attesa</button></form>)}</div></details>:null}
           </div>
         ) : (

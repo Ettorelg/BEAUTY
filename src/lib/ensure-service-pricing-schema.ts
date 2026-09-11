@@ -49,6 +49,9 @@ export function ensureServicePricingSchema() {
         "CREATE INDEX IF NOT EXISTS service_waitlist_slot_idx ON service_waitlist(business_id, service_id, staff_id, starts_at, status, created_at)",
       ),
     );
+    await db.execute(sql.raw("ALTER TABLE service_waitlist ADD COLUMN IF NOT EXISTS requested_day text"));
+    await db.execute(sql.raw("ALTER TABLE service_waitlist ADD COLUMN IF NOT EXISTS any_staff boolean NOT NULL DEFAULT false"));
+    await db.execute(sql.raw("CREATE INDEX IF NOT EXISTS service_waitlist_day_idx ON service_waitlist(business_id, service_id, requested_day, status, created_at)"));
   })();
   return ready;
 }
