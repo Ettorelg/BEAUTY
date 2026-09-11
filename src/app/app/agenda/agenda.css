@@ -121,6 +121,9 @@
 .agenda-panel-heading button { width:32px; min-height:32px!important; border:0; border-radius:50%; background:#f2ece8; color:#594238; font-size:1.2rem; }
 .agenda-product-list { display:grid; gap:6px; }
 .agenda-product-list small { display:flex; justify-content:space-between; gap:12px; padding:8px 10px; border-radius:8px; background:#f7f2ef; }
+.agenda-product-line-actions { display:flex; align-items:center; gap:8px; }
+.agenda-product-line-actions button { width:25px!important; min-height:25px!important; display:grid; place-items:center; border:0; border-radius:50%; padding:0!important; background:#f0dedd; color:#8b3030; font-size:1rem!important; font-weight:900; }
+.agenda-product-line-actions button:hover { background:#e5c5c3; }
 .agenda-product-preview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
 .agenda-product-preview button { display:grid; gap:3px; border:1px solid #d9cbc3; border-radius:9px; padding:9px; background:#fffaf7; color:#3e3029; text-align:left; }
 .agenda-product-preview small { color:#756a65; }

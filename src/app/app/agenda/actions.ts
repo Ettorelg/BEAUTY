@@ -366,6 +366,25 @@ export async function addServiceToAppointment(formData:FormData){
   await db.transaction(async tx=>{const[current]=await tx.select({id:appointments.id,staffId:appointments.staffId,endsAt:appointments.endsAt,status:appointments.status}).from(appointments).where(and(eq(appointments.id,input.appointmentId),eq(appointments.businessId,context.businessId))).limit(1);if(!current||!["BOOKED","CONFIRMED","ARRIVED"].includes(current.status))throw Error("La prenotazione non può essere estesa.");if(context.role==="STAFF"){const ownStaffId=await staffIdForCurrentUser(context.businessId,context.user.id);if(!ownStaffId||ownStaffId!==current.staffId)throw Error("Puoi modificare solo i tuoi appuntamenti.");}const[service]=await tx.select({id:services.id,name:services.name}).from(services).where(and(eq(services.id,input.serviceId),eq(services.businessId,context.businessId),eq(services.active,true))).limit(1);if(!service)throw Error("Servizio non disponibile.");const newEnd=new Date(current.endsAt.getTime()+input.durationMinutes*60_000);const[conflict]=await tx.select({id:appointments.id}).from(appointments).where(and(eq(appointments.businessId,context.businessId),eq(appointments.staffId,current.staffId),ne(appointments.id,current.id),lt(appointments.startsAt,newEnd),gt(appointments.endsAt,current.endsAt),sql`not ${appointments.status} in ('COMPLETED','CANCELLED','NO_SHOW')`)).limit(1);if(conflict)throw Error("Il tempo aggiunto si sovrappone all’appuntamento successivo.");await tx.insert(appointmentAdditionalServices).values({businessId:context.businessId,appointmentId:current.id,serviceId:service.id,serviceName:service.name,durationMinutes:input.durationMinutes,price:input.price.toFixed(2)});await tx.update(appointments).set({endsAt:newEnd,version:sql`${appointments.version} + 1`,updatedAt:new Date()}).where(eq(appointments.id,current.id));await tx.insert(appointmentEvents).values({appointmentId:current.id,businessId:context.businessId,type:"ADDITIONAL_SERVICE_ADDED",actorId:context.user.id,note:`${service.name} · ${input.durationMinutes} min · € ${input.price.toFixed(2)}`});});revalidatePath("/app/agenda");
 }
 
+export async function removeProductFromAppointment(formData: FormData) {
+  const context = await requireBusinessContext();
+  const id = z.string().uuid().parse(formData.get("id"));
+  await ensureInventorySchema();
+  await db.transaction(async (tx) => {
+    const [row] = await tx.select({ id: appointmentProducts.id, appointmentId: appointmentProducts.appointmentId, productId: appointmentProducts.productId, quantity: appointmentProducts.quantity, description: appointmentProducts.description, staffId: appointments.staffId, status: appointments.status }).from(appointmentProducts).innerJoin(appointments, eq(appointments.id, appointmentProducts.appointmentId)).where(and(eq(appointmentProducts.id, id), eq(appointmentProducts.businessId, context.businessId), eq(appointments.businessId, context.businessId))).limit(1);
+    if (!row) throw new Error("Articolo non trovato.");
+    if (!["BOOKED", "CONFIRMED", "ARRIVED"].includes(row.status)) throw new Error("Non puoi modificare gli articoli di una prenotazione conclusa.");
+    if (context.role === "STAFF") { const own = await staffIdForCurrentUser(context.businessId, context.user.id); if (!own || own !== row.staffId) throw new Error("Puoi modificare solo i tuoi appuntamenti."); }
+    await tx.delete(appointmentProducts).where(eq(appointmentProducts.id, id));
+    if (row.productId) {
+      await tx.update(inventoryProducts).set({ stock: sql`${inventoryProducts.stock} + ${row.quantity}`, updatedAt: new Date() }).where(and(eq(inventoryProducts.id, row.productId), eq(inventoryProducts.businessId, context.businessId)));
+      await tx.insert(inventoryMovements).values({ businessId: context.businessId, productId: row.productId, quantity: row.quantity, reason: "STORNO_PRENOTAZIONE", note: `Rimosso da prenotazione: ${row.description}` });
+    }
+    await tx.insert(appointmentEvents).values({ appointmentId: row.appointmentId, businessId: context.businessId, type: "PRODUCT_REMOVED", actorId: context.user.id, note: `${row.description} × ${row.quantity}` });
+  });
+  revalidatePath("/app/agenda"); revalidatePath("/app/inventory");
+}
+
 
 
 
