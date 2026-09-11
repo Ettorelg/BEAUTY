@@ -9,7 +9,7 @@ import { AppNav } from "../app-nav";
 import { LogoutButton } from "../logout-button";
 import { saveBusinessSettings, sendWhatsAppTest } from "./actions";
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; whatsapp?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; whatsapp?: string; reason?: string }> }) {
   const context = await requireBusinessContext();
   if (context.role !== "OWNER") redirect("/app/agenda");
   const query = await searchParams;
@@ -20,7 +20,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     {query.saved ? <p className="success-message">Configurazione salvata.</p> : null}
     {query.whatsapp === "connected" ? <p className="success-message">Account WhatsApp collegato correttamente.</p> : null}
     {query.whatsapp === "test-sent" ? <p className="success-message">Messaggio WhatsApp di prova inviato.</p> : null}
-    {query.whatsapp === "test-error" ? <p className="error-message">Messaggio WhatsApp non inviato. Controlla numero, token e approvazione del template.</p> : null}
+    {query.whatsapp === "test-error" ? <p className="error-message">Messaggio WhatsApp non inviato. {query.reason ? `Dettaglio: ${query.reason}` : "Controlla numero, token e approvazione del template."}</p> : null}
     {query.whatsapp === "incomplete" ? <p className="error-message">Prima collega WhatsApp Business oppure inserisci ID numero, token e template. Poi potrai attivare i promemoria.</p> : null}
     {query.whatsapp === "error" ? <p className="error-message">Collegamento WhatsApp non completato. Riprova o controlla la configurazione Meta.</p> : null}
     <section className="panel"><form action={saveBusinessSettings} className="compact-form stacked">

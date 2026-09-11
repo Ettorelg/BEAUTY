@@ -16,9 +16,15 @@ export async function sendWhatsAppTest(formData: FormData) {
     language: businesses.whatsappTemplateLanguage,
   }).from(businesses).where(eq(businesses.id, context.businessId)).limit(1);
   if (!business?.phoneId || !business.token || !business.template) redirect("/app/settings?whatsapp=test-error");
+  let failureReason = "";
   try {
     const token = decryptWhatsAppToken(business.token);
     const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? "v24.0";
+    const isMetaSample = business.template === "jaspers_market_order_confirmation_v1";
+    const isHelloWorld = business.template === "hello_world";
+    const parameters = isMetaSample
+      ? ["Cliente di prova", "123456", "Sep 11, 2026"]
+      : ["Cliente di prova", business.name, "Servizio di prova", "domani alle 10:00"];
     const response = await fetch(`https://graph.facebook.com/${graphVersion}/${business.phoneId}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -29,13 +35,17 @@ export async function sendWhatsAppTest(formData: FormData) {
         template: {
           name: business.template,
           language: { code: business.language },
-          components: [{ type: "body", parameters: ["Cliente di prova", business.name, "Servizio di prova", "domani alle 10:00"].map(text => ({ type: "text", text })) }],
+          ...(!isHelloWorld ? { components: [{ type: "body", parameters: parameters.map(text => ({ type: "text", text })) }] } : {}),
         },
       }),
     });
-    if (!response.ok) redirect("/app/settings?whatsapp=test-error");
-  } catch {
-    redirect("/app/settings?whatsapp=test-error");
+    if (!response.ok) {
+      const details = await response.json().catch(() => null) as { error?: { message?: string; code?: number } } | null;
+      failureReason = [details?.error?.code ? `Meta ${details.error.code}` : "Errore Meta", details?.error?.message].filter(Boolean).join(": ");
+    }
+  } catch (error) {
+    failureReason = error instanceof Error ? error.message : "Collegamento WhatsApp non disponibile.";
   }
+  if (failureReason) redirect(`/app/settings?whatsapp=test-error&reason=${encodeURIComponent(failureReason.slice(0, 240))}`);
   redirect("/app/settings?whatsapp=test-sent");
 }
