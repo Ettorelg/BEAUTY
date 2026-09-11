@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { appointmentAdditionalServices, appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryCategories, inventoryCategoryServiceCategories, inventoryCategoryServices, inventoryProducts, inventoryProductServices, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
+import { appointmentAdditionalServices, appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryCategories, inventoryCategoryServiceCategories, inventoryCategoryServices, inventoryProducts, inventoryProductServices, serviceCategories, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
@@ -60,14 +60,14 @@ export async function GET(request: NextRequest) {
       .from(staffMembers)
       .where(and(staffCondition, eq(staffMembers.active, true)))
       .orderBy(asc(staffMembers.name)),
-    isOwner
-      ? db
-          .select({ staffId: staffServices.staffId, id: services.id, name: services.name, duration: services.durationMinutes })
+    db
+          .select({ staffId: staffServices.staffId, id: services.id, name: services.name, duration: services.durationMinutes, categoryId: services.categoryId, categoryName: serviceCategories.name })
           .from(staffServices)
           .innerJoin(services, and(eq(staffServices.serviceId, services.id), eq(services.businessId, context.businessId), eq(services.active, true)))
-          .where(eq(staffServices.businessId, context.businessId))
+          .innerJoin(serviceCategories, eq(serviceCategories.id, services.categoryId))
+          .where(and(eq(staffServices.businessId, context.businessId), isOwner ? undefined : eq(staffServices.staffId, ownStaff!.id)))
           .orderBy(asc(services.name))
-      : Promise.resolve([]),
+    ,
     db
       .select({
         id: appointments.id,
@@ -153,6 +153,6 @@ export async function GET(request: NextRequest) {
   const rescheduleRequests = await db.select({ id: appointmentRescheduleRequests.id, appointmentId: appointmentRescheduleRequests.appointmentId, proposedStartsAt: appointmentRescheduleRequests.proposedStartsAt, customerName: customerRelations.name, serviceName: appointments.serviceName, currentStaffId: appointments.staffId, proposedStaffId: appointmentRescheduleRequests.proposedStaffId })
     .from(appointmentRescheduleRequests).innerJoin(appointments, eq(appointments.id, appointmentRescheduleRequests.appointmentId)).leftJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId)).where(and(eq(appointmentRescheduleRequests.businessId, context.businessId), eq(appointmentRescheduleRequests.proposerType, "CUSTOMER"), eq(appointmentRescheduleRequests.status, "PENDING"), gt(appointmentRescheduleRequests.expiresAt, new Date()), isOwner ? undefined : eq(appointments.staffId, ownStaff!.id)));
   const staffNames = new Map(staff.map(member => [member.id, member.name]));
-  return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, inventoryEnabled: context.modules.includes("INVENTORY"), inventoryCatalog, usedProducts, additionalServiceCatalog, staff, catalog, entries:enrichedEntries, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
+  return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, canEditAppointments: true, inventoryEnabled: context.modules.includes("INVENTORY"), inventoryCatalog, usedProducts, additionalServiceCatalog, staff, catalog, entries:enrichedEntries, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
 }
 

@@ -8,7 +8,7 @@ import { CustomerAutofill } from "./customer-autofill";
 import { AppointmentPriceEditor } from "./appointment-price-editor";
 
 type Staff = { id: string; name: string };
-type Service = { staffId: string; id: string; name: string; duration: number };
+type Service = { staffId: string; id: string; name: string; duration: number; categoryId: string; categoryName: string };
 type Entry = {
   id: string;
   startsAt: string;
@@ -26,6 +26,7 @@ type Entry = {
   additionalServices: Array<{appointmentId:string;name:string;duration:number;price:string}>;
   recommendedProductIds: string[];
   rememberedNote?: string | null;
+  notes?: string | null;
   absenceConflict?: boolean;
 };
 type Data = {
@@ -34,6 +35,7 @@ type Data = {
   view: AgendaView;
   timezone: string;
   canManage: boolean;
+  canEditAppointments: boolean;
   staff: Staff[];
   catalog: Service[];
   inventoryEnabled: boolean;
@@ -61,6 +63,8 @@ function AdditionalServiceForm({data,entry,load,setError}:{data:Data;entry:Entry
   return <div className="agenda-extra-service"><h4>Aggiungi un servizio</h4>{entry.additionalServices.length?<div className="agenda-product-list">{entry.additionalServices.map((service,index)=><small key={index}><span>{service.name} · +{service.duration} min</span><strong>{money(Number(service.price))}</strong></small>)}</div>:null}<form action={async formData=>{try{await addServiceToAppointment(formData);await load();}catch(error){setError(error instanceof Error?error.message:"Impossibile aggiungere il servizio.");}}} className="compact-form stacked"><input type="hidden" name="appointmentId" value={entry.id}/><label>Servizio<select name="serviceId" value={serviceId} onChange={event=>{const selected=data.additionalServiceCatalog.find(service=>service.id===event.target.value);setServiceId(event.target.value);if(selected){setDuration(selected.duration);setPrice(selected.price);}}}>{data.additionalServiceCatalog.map(service=><option key={service.id} value={service.id}>{service.name}</option>)}</select></label><div className="form-row"><label>Tempo aggiuntivo (minuti)<input name="durationMinutes" type="number" min="5" max="480" step="5" value={duration} onChange={event=>setDuration(Number(event.target.value))}/></label><label>Costo aggiuntivo (€)<input name="price" type="number" min="0" step=".01" value={price} onChange={event=>setPrice(event.target.value)}/></label></div><p className="muted">Puoi modificare subito durata e prezzo rispetto ai valori del listino.</p><button className="primary-button">Aggiungi servizio e prolunga l’appuntamento</button></form></div>;
 }
 
+function EditServiceForm({data,entry}:{data:Data;entry:Entry}){const unique=Array.from(new Map(data.catalog.map(item=>[item.id,item])).values()),current=unique.find(item=>item.id===entry.serviceId)??unique[0],categories=Array.from(new Map(unique.map(item=>[item.categoryId,item.categoryName])).entries()),[category,setCategory]=useState(current?.categoryId??categories[0]?.[0]??""),filtered=unique.filter(item=>item.categoryId===category),[serviceId,setServiceId]=useState(current?.id??""),[duration,setDuration]=useState(current?.duration??30);return <form action={changeAppointmentService} className="compact-form stacked"><input type="hidden" name="id" value={entry.id}/><label>Categoria<select value={category} onChange={event=>{const id=event.target.value,first=unique.find(item=>item.categoryId===id);setCategory(id);setServiceId(first?.id??"");setDuration(first?.duration??30)}}>{categories.map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></label><label>Servizio<select name="serviceId" value={serviceId} onChange={event=>{const item=unique.find(option=>option.id===event.target.value);setServiceId(event.target.value);setDuration(item?.duration??30)}}>{filtered.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label><input type="hidden" name="durationMinutes" value={duration}/><label>Durata<div className="duration-stepper"><button type="button" onClick={()=>setDuration(value=>Math.max(5,value-5))}>−</button><strong>{duration} min</strong><button type="button" onClick={()=>setDuration(value=>Math.min(480,value+5))}>＋</button></div></label><button className="ghost-button">Salva servizio e durata</button></form>}
+
 const statusLabels: Record<string, string> = {
   BOOKED: "Prenotato",
   CONFIRMED: "Confermato",
@@ -73,7 +77,13 @@ const editableStatuses = ["BOOKED", "CONFIRMED", "ARRIVED"];
 const weekDays = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
 
 function Booking({ data, date, close, done }: { data: Data; date: string; close: () => void; done: () => void }) {
-  const [service, setService] = useState(data.catalog[0]?.id ?? "");
+  const uniqueServices = Array.from(new Map(data.catalog.map((item) => [item.id, item])).values());
+  const categories = Array.from(new Map(uniqueServices.map((item) => [item.categoryId, item.categoryName])).entries());
+  const [category, setCategory] = useState(categories[0]?.[0] ?? "");
+  const categoryServices = uniqueServices.filter((item) => item.categoryId === category);
+  const [service, setService] = useState(categoryServices[0]?.id ?? "");
+  const selectedService = uniqueServices.find((item) => item.id === service);
+  const [duration, setDuration] = useState(selectedService?.duration ?? 30);
   const [staff, setStaff] = useState("");
   const [day, setDay] = useState(date);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -85,11 +95,11 @@ function Booking({ data, date, close, done }: { data: Data; date: string; close:
     setSelected(undefined);
     if (!service) return;
     setLoading(true);
-    fetch(`/api/agenda/availability?serviceId=${service}&date=${day}&staffId=${staff}`)
+    fetch(`/api/agenda/availability?serviceId=${service}&date=${day}&staffId=${staff}&durationMinutes=${duration}`)
       .then((response) => response.json())
       .then((payload) => setSlots(payload.slots ?? []))
       .finally(() => setLoading(false));
-  }, [service, staff, day]);
+  }, [service, staff, day, duration]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -98,6 +108,7 @@ function Booking({ data, date, close, done }: { data: Data; date: string; close:
     formData.set("staffId", selected.staffId);
     formData.set("serviceId", service);
     formData.set("startsAt", selected.localStart);
+    formData.set("durationMinutes", String(duration));
     const result = await createAppointment(formData);
     if (!result.ok) {
       alert(result.error ?? "Creazione appuntamento non riuscita.");
@@ -114,14 +125,18 @@ function Booking({ data, date, close, done }: { data: Data; date: string; close:
         <p className="eyebrow">Nuova prenotazione</p>
         <h2>Scegli disponibilità</h2>
         <form className="compact-form stacked" onSubmit={submit}>
+          <label>Categoria<select value={category} onChange={(event) => { const nextCategory=event.target.value;const first=uniqueServices.find(item=>item.categoryId===nextCategory);setCategory(nextCategory);setService(first?.id??"");setDuration(first?.duration??30);setStaff(""); }}>
+            {categories.map(([id,name])=><option value={id} key={id}>{name}</option>)}
+          </select></label>
           <label>
             Servizio
-            <select value={service} onChange={(event) => { setService(event.target.value); setStaff(""); }}>
-              {Array.from(new Map(data.catalog.map((item) => [item.id, item])).values()).map((item) => (
+            <select value={service} onChange={(event) => { const next=uniqueServices.find(item=>item.id===event.target.value);setService(event.target.value);setDuration(next?.duration??30);setStaff(""); }}>
+              {categoryServices.map((item) => (
                 <option value={item.id} key={item.id}>{item.name} · {item.duration} min</option>
               ))}
             </select>
           </label>
+          <label>Durata appuntamento<div className="duration-stepper"><button type="button" onClick={()=>setDuration(value=>Math.max(5,value-5))}>−</button><strong>{duration} min</strong><button type="button" onClick={()=>setDuration(value=>Math.min(480,value+5))}>＋</button></div></label>
           <label>
             Operatore (facoltativo)
             <select value={staff} onChange={(event) => setStaff(event.target.value)}>
@@ -334,7 +349,7 @@ export function AgendaCalendar({ today }: { today: string }) {
           <strong>{day.slice(8)}</strong>
         </button>
         {data.entries.filter((entry) => dayForEntry(entry) === day).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id}>
-          <span>{time(entry.startsAt)}</span><strong>{entry.customerName}</strong><small>{entry.serviceName} · {entry.staffName}</small><small className="agenda-price">{money(Number(entry.price))}</small><em>{statusLabels[entry.status]}</em>{entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto assenza</strong> : null}
+          <span>{time(entry.startsAt)}</span><strong>{entry.customerName}</strong><small>{entry.serviceName}</small><small className="agenda-price">{money(Number(entry.price)+entry.productTotal+entry.additionalServiceTotal)}</small>{entry.notes?<small className="agenda-card-note">{entry.notes}</small>:null}{entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto assenza</strong> : null}
         </article>)}
       </section>)}
     </div> : <div className="agenda-scroll">
@@ -350,6 +365,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                 <span>{slotTime}</span>
                 <strong>{entry.customerName}</strong>
                 <small>{entry.serviceName} · {entry.staffName}</small>
+                {entry.notes ? <small className="agenda-card-note">{entry.notes}</small> : null}
                 <div className="agenda-total"><span>Totale</span><strong>{money(Number(entry.price)+entry.productTotal+entry.additionalServiceTotal)}</strong>{entry.productTotal+entry.additionalServiceTotal>0?<small>Base {money(Number(entry.price))}{entry.additionalServiceTotal>0?` + servizi ${money(entry.additionalServiceTotal)}`:""}{entry.productTotal>0?` + prodotti ${money(entry.productTotal)}`:""}</small>:null}</div>
                 {entry.previousOutstanding > 0 ? <small className="agenda-outstanding-badge">Sospeso {money(entry.previousOutstanding)} · Totale {money(entry.previousOutstanding + Number(entry.price))}</small> : null}
                 <em>{statusLabels[entry.status]}</em>
@@ -360,7 +376,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                   {editableStatuses.includes(entry.status)?<button type="button" className="agenda-complete-action" aria-label="Chiudi prenotazione" title="Chiudi prenotazione" onClick={event => {event.stopPropagation();setCompletionFor(entry.id);setCompletionNote(entry.rememberedNote ?? "");setCompletionPayment("PAID");setFailureFor("");}}>✓</button>:null}
                 </div>
                 {editFor===entry.id ? <section className="agenda-action-panel agenda-booking-modal" onClick={event=>event.stopPropagation()}><div className="agenda-panel-heading"><div><span className="eyebrow">Prenotazione</span><strong>{entry.customerName} · {entry.serviceName}</strong></div><button type="button" aria-label="Chiudi" onClick={()=>setEditFor("")}>×</button></div>
-                  {data.canManage && editableStatuses.includes(entry.status) ? <details className="agenda-modal-section"><summary>Modifica servizio</summary><form action={changeAppointmentService} className="compact-form stacked"><input type="hidden" name="id" value={entry.id}/><label>Servizio<select name="serviceId" defaultValue={entry.serviceId}>{data.catalog.filter((option, index, all) => all.findIndex((item) => item.id === option.id) === index).map((option) => <option value={option.id} key={option.id}>{option.name} · {option.duration} min</option>)}</select></label><button className="ghost-button">Cambia servizio</button></form></details> : null}
+                  {data.canEditAppointments && editableStatuses.includes(entry.status) ? <details className="agenda-modal-section"><summary>Modifica servizio e durata</summary><EditServiceForm data={data} entry={entry}/></details> : null}
                   <details className="agenda-modal-section"><summary>Sposta data o operatore</summary><form action={rescheduleAppointment}>
                     <input type="hidden" name="id" value={entry.id} />
                     <input name="startsAt" type="datetime-local" required />

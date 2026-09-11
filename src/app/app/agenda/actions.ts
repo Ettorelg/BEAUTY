@@ -45,6 +45,7 @@ const bookingSchema = z.object({
   email: z.string().trim().email().optional(),
   phone: z.string().trim().min(6).max(30).optional(),
   startsAt: z.string(),
+  durationMinutes: z.coerce.number().int().min(5).max(480).optional(),
   notes: z.string().trim().max(500).optional(),
   idempotencyKey: z.string().uuid(),
 }).refine((value) => value.email || value.phone, { message: "Inserisci email o telefono." });
@@ -66,7 +67,7 @@ async function createAppointmentOrThrow(formData: FormData) {
   const input = bookingSchema.parse({
     staffId: formData.get("staffId"), serviceId: formData.get("serviceId"), customerId: formData.get("customerId") || undefined, customerName: formData.get("customerName"),
     email: formData.get("email") || undefined, phone: formData.get("phone") || undefined,
-    startsAt: formData.get("startsAt"), notes: formData.get("notes") || undefined, idempotencyKey: formData.get("idempotencyKey"),
+    startsAt: formData.get("startsAt"), durationMinutes: formData.get("durationMinutes") || undefined, notes: formData.get("notes") || undefined, idempotencyKey: formData.get("idempotencyKey"),
   });
   const [selection] = await db.select({ serviceName: services.name, durationMinutes: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice, repeatPriceEnabled: services.repeatPriceEnabled, repeatDurationMinutes: services.repeatDurationMinutes })
     .from(staffServices).innerJoin(staffMembers, and(eq(staffServices.staffId, staffMembers.id), eq(staffMembers.businessId, context.businessId)))
@@ -103,7 +104,7 @@ const identity = or(
       eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, customerId),
       eq(appointments.serviceId, input.serviceId), eq(appointments.status, "COMPLETED"),
     )).limit(1);
-    const bookingDuration = previousService && selection.repeatDurationMinutes != null ? selection.repeatDurationMinutes : selection.durationMinutes;
+    const bookingDuration = input.durationMinutes ?? (previousService && selection.repeatDurationMinutes != null ? selection.repeatDurationMinutes : selection.durationMinutes);
     const endsAt = new Date(startsAt.getTime() + bookingDuration * 60_000);
     const [conflict] = await tx.select({ id: appointments.id }).from(appointments).where(and(
       eq(appointments.businessId, context.businessId), eq(appointments.staffId, input.staffId),
@@ -177,13 +178,13 @@ function inArrayValue<T extends readonly string[]>(values: T, value: string): va
 
 export async function changeAppointmentService(formData: FormData) {
   const context = await requireBusinessContext();
-  if (context.role !== "OWNER") throw new Error("Operazione riservata al titolare.");
-  const input = z.object({ id: z.string().uuid(), serviceId: z.string().uuid() }).parse(Object.fromEntries(formData));
+  const input = z.object({ id: z.string().uuid(), serviceId: z.string().uuid(), durationMinutes:z.coerce.number().int().min(5).max(480).optional() }).parse(Object.fromEntries(formData));
   await db.transaction(async (tx) => {
     const [current] = await tx.select({ serviceName: appointments.serviceName, startsAt: appointments.startsAt, status: appointments.status, customerId: appointments.customerRelationId }).from(appointments).where(and(
       eq(appointments.id, input.id), eq(appointments.businessId, context.businessId),
     )).limit(1);
     if (!current) throw new Error("Appuntamento non trovato.");
+    if(context.role==="STAFF"){const own=await staffIdForCurrentUser(context.businessId,context.user.id);const[row]=await tx.select({staffId:appointments.staffId}).from(appointments).where(eq(appointments.id,input.id));if(!own||row?.staffId!==own)throw Error("Puoi modificare solo i tuoi appuntamenti.");}
     if (!["BOOKED", "CONFIRMED", "ARRIVED"].includes(current.status)) throw new Error("Il servizio può essere cambiato solo su un appuntamento attivo.");
     const [service] = await tx.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price, repeatPrice: services.repeatPrice, repeatPriceEnabled: services.repeatPriceEnabled, repeatDurationMinutes: services.repeatDurationMinutes }).from(services).where(and(
       eq(services.id, input.serviceId), eq(services.businessId, context.businessId), eq(services.active, true),
@@ -193,7 +194,7 @@ export async function changeAppointmentService(formData: FormData) {
       eq(appointments.businessId, context.businessId), eq(appointments.customerRelationId, current.customerId),
       eq(appointments.serviceId, service.id), eq(appointments.status, "COMPLETED"), ne(appointments.id, input.id),
     )).limit(1);
-    const serviceDuration = previousService && service.repeatDurationMinutes != null ? service.repeatDurationMinutes : service.duration;
+    const serviceDuration = input.durationMinutes ?? (previousService && service.repeatDurationMinutes != null ? service.repeatDurationMinutes : service.duration);
     const endsAt = new Date(current.startsAt.getTime() + serviceDuration * 60_000);
     const servicePrice = previousService && service.repeatPriceEnabled && service.repeatPrice != null ? service.repeatPrice : service.price;
     await tx.update(appointments).set({
