@@ -7,9 +7,9 @@ import { BUSINESS_TYPES, BUSINESS_TYPE_LABELS, MODULE_LABELS, OPTIONAL_MODULES }
 import { requireBusinessContext } from "@/lib/business-context";
 import { AppNav } from "../app-nav";
 import { LogoutButton } from "../logout-button";
-import { saveBusinessSettings, sendWhatsAppTest } from "./actions";
+import { configureWhatsAppTemplates, saveBusinessSettings, sendWhatsAppTest } from "./actions";
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; whatsapp?: string; reason?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; whatsapp?: string; reason?: string; created?: string }> }) {
   const context = await requireBusinessContext();
   if (context.role !== "OWNER") redirect("/app/agenda");
   const query = await searchParams;
@@ -20,6 +20,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     {query.saved ? <p className="success-message">Configurazione salvata.</p> : null}
     {query.whatsapp === "connected" ? <p className="success-message">Account WhatsApp collegato correttamente.</p> : null}
     {query.whatsapp === "test-sent" ? <p className="success-message">Messaggio WhatsApp di prova inviato.</p> : null}
+    {query.whatsapp === "templates-ready" ? <p className="success-message">Messaggi standard configurati. {query.created === "0" ? "Erano già presenti." : `${query.created} inviati a Meta per l’approvazione.`}</p> : null}
+    {query.whatsapp === "templates-error" ? <p className="error-message">Impossibile configurare i messaggi standard. {query.reason}</p> : null}
     {query.whatsapp === "test-error" ? <p className="error-message">Messaggio WhatsApp non inviato. {query.reason ? `Dettaglio: ${query.reason}` : "Controlla numero, token e approvazione del template."}</p> : null}
     {query.whatsapp === "incomplete" ? <p className="error-message">Prima collega WhatsApp Business tramite il QR code. Poi potrai attivare le notifiche.</p> : null}
     {query.whatsapp === "error" ? <p className="error-message">Collegamento WhatsApp non completato. Riprova o controlla la configurazione Meta.</p> : null}
@@ -29,6 +31,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <details className="service-category"><summary>Collega WhatsApp Business<span>{whatsappConfigured ? "Account collegato" : "Da configurare"}</span></summary><div className="compact-form stacked">
         {process.env.META_APP_ID && process.env.META_WHATSAPP_CONFIG_ID ? <a className="primary-button link-button" href="/api/integrations/meta/whatsapp/start">{whatsappConfigured ? "Ricollega o cambia numero WhatsApp" : "Collega WhatsApp Business"}</a> : <p className="empty-state">Il collegamento automatico deve essere abilitato dall’amministratore di Alpha Prenota.</p>}
         {whatsappConfigured ? <p className="success-message">WhatsApp Business è collegato.</p> : <p className="muted">Non devi inserire codici: premi il pulsante, accedi a Meta e scegli il numero WhatsApp Business dell’attività.</p>}
+        {whatsappConfigured ? <button className="ghost-button" formAction={configureWhatsAppTemplates}>Configura messaggi standard</button> : null}
         <input type="hidden" name="whatsappPhoneNumberId" value={business?.phoneId ?? ""}/>
         <input type="hidden" name="whatsappReminderTemplate" value={business?.template ?? "promemoria_prenotazione"}/>
         <input type="hidden" name="whatsappTemplateLanguage" value={business?.language ?? "it"}/>

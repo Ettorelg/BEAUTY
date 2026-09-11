@@ -6,6 +6,7 @@ import { businessMemberships, businesses } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { ensureBusinessSettingsSchema } from "@/lib/ensure-business-settings-schema";
 import { encryptWhatsAppToken } from "@/lib/whatsapp-credentials";
+import { ensureStandardWhatsAppTemplates } from "@/lib/whatsapp-templates";
 
 const callbackUrl = "https://prenota.alphasystemsrl.it/api/integrations/meta/whatsapp/callback";
 const failure = () => NextResponse.redirect(new URL("/app/settings?whatsapp=error", callbackUrl));
@@ -74,6 +75,11 @@ export async function GET(request: NextRequest) {
     whatsappTemplateLanguage: "it",
     updatedAt: new Date(),
   }).where(eq(businesses.id, membership.businessId));
+  if (info.wabaId) {
+    await ensureStandardWhatsAppTemplates({ wabaId: info.wabaId, accessToken: tokenData.access_token, language: "it" }).catch(error => {
+      console.error("Automatic WhatsApp template configuration failed", error instanceof Error ? error.message : error);
+    });
+  }
   const response = NextResponse.redirect(new URL("/app/settings?whatsapp=connected", callbackUrl));
   response.cookies.delete("wa_signup_state");
   response.cookies.delete("wa_signup_business");

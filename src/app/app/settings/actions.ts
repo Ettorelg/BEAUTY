@@ -1,5 +1,6 @@
 "use server";
 import { eq } from "drizzle-orm"; import { redirect } from "next/navigation"; import { z } from "zod"; import { db } from "@/db/client"; import { businesses } from "@/db/schema"; import { requireBusinessContext } from "@/lib/business-context"; import { BUSINESS_TYPES,normalizeBusinessType,OPTIONAL_MODULES,serializeModules } from "@/lib/business-settings"; import { decryptWhatsAppToken, encryptWhatsAppToken } from "@/lib/whatsapp-credentials";
+import { ensureStandardWhatsAppTemplates } from "@/lib/whatsapp-templates";
 export async function saveBusinessSettings(formData:FormData){const c=await requireBusinessContext();if(c.role!=="OWNER")throw Error("Operazione riservata al titolare.");const type=normalizeBusinessType(z.enum(BUSINESS_TYPES).parse(formData.get("businessType")));const modules=OPTIONAL_MODULES.filter(module=>formData.get(`module_${module}`)==="on"),enabled=formData.get("whatsappRemindersEnabled")==="on",phoneId=z.string().trim().max(100).parse(formData.get("whatsappPhoneNumberId")??""),template=z.string().trim().max(200).parse(formData.get("whatsappReminderTemplate")??""),language=z.string().trim().min(2).max(10).parse(formData.get("whatsappTemplateLanguage")||"it"),plainToken=z.string().trim().max(2000).parse(formData.get("whatsappAccessToken")??"");const[current]=await db.select({token:businesses.whatsappAccessTokenEncrypted}).from(businesses).where(eq(businesses.id,c.businessId)).limit(1);if(enabled&&(!phoneId||!template||(!plainToken&&!current?.token)))redirect("/app/settings?whatsapp=incomplete");await db.update(businesses).set({businessType:type,enabledModules:serializeModules(modules),whatsappRemindersEnabled:enabled,whatsappPhoneNumberId:phoneId||null,whatsappReminderTemplate:template||null,whatsappTemplateLanguage:language,...(plainToken?{whatsappAccessTokenEncrypted:encryptWhatsAppToken(plainToken)}:{}),updatedAt:new Date()}).where(eq(businesses.id,c.businessId));redirect("/app/settings?saved=1");}
 
 export async function sendWhatsAppTest(formData: FormData) {
@@ -48,4 +49,24 @@ export async function sendWhatsAppTest(formData: FormData) {
   }
   if (failureReason) redirect(`/app/settings?whatsapp=test-error&reason=${encodeURIComponent(failureReason.slice(0, 240))}`);
   redirect("/app/settings?whatsapp=test-sent");
+}
+
+export async function configureWhatsAppTemplates() {
+  const context = await requireBusinessContext();
+  if (context.role !== "OWNER") throw new Error("Operazione riservata al titolare.");
+  const [business] = await db.select({
+    wabaId: businesses.whatsappBusinessAccountId,
+    token: businesses.whatsappAccessTokenEncrypted,
+    language: businesses.whatsappTemplateLanguage,
+  }).from(businesses).where(eq(businesses.id, context.businessId)).limit(1);
+  if (!business?.wabaId || !business.token) redirect("/app/settings?whatsapp=incomplete");
+  let created: number;
+  try {
+    const result = await ensureStandardWhatsAppTemplates({ wabaId: business.wabaId, accessToken: decryptWhatsAppToken(business.token), language: business.language });
+    created = result.created;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Configurazione template non riuscita.";
+    redirect(`/app/settings?whatsapp=templates-error&reason=${encodeURIComponent(reason.slice(0, 240))}`);
+  }
+  redirect(`/app/settings?whatsapp=templates-ready&created=${created}`);
 }
