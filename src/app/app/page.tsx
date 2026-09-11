@@ -102,6 +102,7 @@ export default async function AppPage() {
         <Link className="dashboard-action" href="/app/customers"><span>⌕</span><div><strong>Cerca un cliente</strong><small>Anagrafica e storico</small></div></Link>
         <Link className="dashboard-action" href="/app/fidelity"><span>★</span><div><strong>Fidelity e promozioni</strong><small>Regole, punti e offerte</small></div></Link>
         <Link className="dashboard-action" href="/app/statistics"><span>↗</span><div><strong>Controlla statistiche</strong><small>Incassi e andamento</small></div></Link>
+        <Link className="dashboard-action" href="/account"><span>☺</span><div><strong>Accedi come cliente</strong><small>Visualizza l’esperienza del cliente</small></div></Link>
       </aside>
     </section>
 
