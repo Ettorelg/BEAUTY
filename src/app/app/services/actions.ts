@@ -1,12 +1,13 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
   appointments,
   serviceCategories,
+  serviceAdditionalCompatibilities,
   serviceWaitlist,
   services,
   staffServices,
@@ -35,6 +36,7 @@ const serviceSchema = z.object({
   waitlistEnabled: z.coerce.boolean(),
   waitlistConfirmationMinutes: z.coerce.number().int().min(15).max(10080),
   addsDuration: z.coerce.boolean(),
+  additionalServiceMode: z.enum(["ALL", "NONE", "SELECTED"]),
 });
 
 function ownerOnly(role: string) {
@@ -85,6 +87,7 @@ export async function createService(formData: FormData) {
     waitlistConfirmationMinutes:
       formData.get("waitlistConfirmationMinutes") || 120,
     addsDuration: formData.get("addsDuration") === "on",
+    additionalServiceMode: z.enum(["ALL", "NONE", "SELECTED"]).catch("ALL").parse(formData.get("additionalServiceMode")),
   });
   const [category] = await db
     .select({ id: serviceCategories.id })
@@ -113,6 +116,7 @@ export async function createService(formData: FormData) {
     waitlistEnabled: input.waitlistEnabled,
     waitlistConfirmationMinutes: input.waitlistConfirmationMinutes,
     addsDuration: input.addsDuration,
+    additionalServiceMode: input.additionalServiceMode,
   });
   refreshServicePages();
 }
@@ -137,6 +141,7 @@ export async function updateService(formData: FormData) {
     waitlistConfirmationMinutes:
       formData.get("waitlistConfirmationMinutes") || 120,
     addsDuration: formData.get("addsDuration") === "on",
+    additionalServiceMode: z.enum(["ALL", "NONE", "SELECTED"]).catch("ALL").parse(formData.get("additionalServiceMode")),
   });
   const [category] = await db
     .select({ id: serviceCategories.id })
@@ -165,6 +170,7 @@ export async function updateService(formData: FormData) {
       waitlistEnabled: input.waitlistEnabled,
       waitlistConfirmationMinutes: input.waitlistConfirmationMinutes,
       addsDuration: input.addsDuration,
+      additionalServiceMode: input.additionalServiceMode,
       updatedAt: new Date(),
     })
     .where(
@@ -173,6 +179,12 @@ export async function updateService(formData: FormData) {
         eq(services.businessId, context.businessId),
       ),
     );
+  await db.delete(serviceAdditionalCompatibilities).where(and(eq(serviceAdditionalCompatibilities.businessId, context.businessId), eq(serviceAdditionalCompatibilities.primaryServiceId, input.id)));
+  if (input.additionalServiceMode === "SELECTED") {
+    const requested = [...new Set(formData.getAll("compatibleServiceIds").map(String))].filter(id => id !== input.id && z.string().uuid().safeParse(id).success);
+    const valid = requested.length ? await db.select({ id: services.id }).from(services).where(and(eq(services.businessId, context.businessId), eq(services.active, true), inArray(services.id, requested))) : [];
+    if (valid.length) await db.insert(serviceAdditionalCompatibilities).values(valid.map(item => ({ businessId: context.businessId, primaryServiceId: input.id, additionalServiceId: item.id })));
+  }
   refreshServicePages();
 }
 

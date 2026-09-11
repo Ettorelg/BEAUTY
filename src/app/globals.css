@@ -288,6 +288,19 @@ button { cursor: pointer; }
   .slot-grid { grid-template-columns: repeat(2, 1fr); }
   .date-picker { grid-template-columns: 1fr; }
 }
+
+.compact-service-categories { gap: 8px; }
+.compact-service-category { padding: 0 !important; overflow: hidden; }
+.compact-service-category > summary { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; cursor: pointer; list-style: none; }
+.compact-service-category > summary small { color: var(--muted); font-weight: 700; }
+.compact-service-category-body { padding: 0 8px 8px; }
+.compact-service-category-body .data-list { gap: 5px; }
+.compact-service-row { min-height: 0; padding: 8px 10px !important; align-items: center; }
+.compact-service-row h3 { margin: 0; font-size: .96rem; }
+.compact-service-row p { margin: 3px 0 0; font-size: .78rem; }
+.compact-service-row .edit-disclosure { margin-top: 5px; }
+.compact-service-row .edit-disclosure > summary { font-size: .78rem; }
+.compact-service-row .delete-form summary { padding: 6px 9px; font-size: .72rem; }
 .auth-professional { background: radial-gradient(circle at 15% 10%, #6f5145 0, #2a211e 42%, #151313 100%); }
 .auth-professional .auth-card { background: #fffaf7; border-color: #9b7665; }
 .auth-customer { background: radial-gradient(circle at 85% 0%, #f4d9d0 0, #fff8f5 48%, #f8eee9 100%); }

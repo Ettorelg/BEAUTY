@@ -21,6 +21,7 @@ import {
   staffMembers,
   staffServices,
   serviceWaitlist,
+  serviceAdditionalCompatibilities,
   users,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
@@ -77,6 +78,7 @@ export async function createPublicAppointment(formData: FormData) {
       repeatPriceEnabled: services.repeatPriceEnabled,
       repeatDuration: services.repeatDurationMinutes,
       capacity: services.capacity,
+      additionalServiceMode: services.additionalServiceMode,
     })
     .from(businesses)
     .innerJoin(locations, eq(locations.businessId, businesses.id))
@@ -109,6 +111,11 @@ export async function createPublicAppointment(formData: FormData) {
     .limit(1);
   if (!selection) throw Error("Prenotazione non valida.");
   const extraIds = [...new Set(input.additionalServiceIds)].filter(id => id !== input.serviceId);
+  if (extraIds.length && selection.additionalServiceMode === "NONE") throw Error("Questo servizio non può essere abbinato ad altri servizi.");
+  if (extraIds.length && selection.additionalServiceMode === "SELECTED") {
+    const allowed = await db.select({ id: serviceAdditionalCompatibilities.additionalServiceId }).from(serviceAdditionalCompatibilities).where(and(eq(serviceAdditionalCompatibilities.businessId, selection.businessId), eq(serviceAdditionalCompatibilities.primaryServiceId, input.serviceId), inArray(serviceAdditionalCompatibilities.additionalServiceId, extraIds)));
+    if (allowed.length !== extraIds.length) throw Error("Uno dei servizi scelti non è compatibile con il servizio principale.");
+  }
   const extras = extraIds.length ? await db.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price, addsDuration: services.addsDuration }).from(services).innerJoin(staffServices, and(eq(staffServices.serviceId, services.id), eq(staffServices.staffId, staffId), eq(staffServices.businessId, selection.businessId))).where(and(eq(services.businessId, selection.businessId), eq(services.active, true), eq(services.onlineBookable, true), inArray(services.id, extraIds))) : [];
   if (extras.length !== extraIds.length) throw Error("Uno dei servizi aggiuntivi non è disponibile con questo operatore.");
   const extraDuration = extras.filter(item => item.addsDuration).reduce((sum, item) => sum + item.duration, 0);

@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { serviceCategories, serviceWaitlist, services, staffMembers } from "@/db/schema";
+import { serviceAdditionalCompatibilities, serviceCategories, serviceWaitlist, services, staffMembers } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
 import { AppNav } from "../app-nav";
@@ -42,6 +42,7 @@ export default async function ServicesPage() {
       waitlistEnabled: services.waitlistEnabled,
       waitlistConfirmationMinutes: services.waitlistConfirmationMinutes,
       addsDuration: services.addsDuration,
+      additionalServiceMode: services.additionalServiceMode,
       categoryName: serviceCategories.name,
     })
     .from(services)
@@ -63,6 +64,7 @@ export default async function ServicesPage() {
     ...category,
     services: catalog.filter((service) => service.categoryId === category.id),
   }));
+  const compatibilityLinks = await db.select({ primaryServiceId: serviceAdditionalCompatibilities.primaryServiceId, additionalServiceId: serviceAdditionalCompatibilities.additionalServiceId }).from(serviceAdditionalCompatibilities).where(eq(serviceAdditionalCompatibilities.businessId, context.businessId));
   const waitlist = context.role === "OWNER" ? await db.select({ id: serviceWaitlist.id, customerName: serviceWaitlist.customerName, email: serviceWaitlist.email, phone: serviceWaitlist.phone, startsAt: serviceWaitlist.startsAt, requestedDay: serviceWaitlist.requestedDay, status: serviceWaitlist.status, offeredAt: serviceWaitlist.offeredAt, expiresAt: serviceWaitlist.offerExpiresAt, createdAt: serviceWaitlist.createdAt, serviceName: services.name, staffName: staffMembers.name }).from(serviceWaitlist).innerJoin(services, eq(services.id, serviceWaitlist.serviceId)).innerJoin(staffMembers, eq(staffMembers.id, serviceWaitlist.staffId)).where(and(eq(serviceWaitlist.businessId, context.businessId), inArray(serviceWaitlist.status, ["WAITING", "OFFERED"]))).orderBy(asc(serviceWaitlist.createdAt)).limit(100) : [];
 
   return (
@@ -218,6 +220,7 @@ export default async function ServicesPage() {
                   Prenotabile online
                 </label>
                 <label className="checkbox-row"><input name="addsDuration" type="checkbox" defaultChecked/> Se aggiunto a un’altra prenotazione, aumenta anche la durata</label>
+                <label>Abbinamento con altri servizi<select name="additionalServiceMode" defaultValue="ALL"><option value="ALL">Abbinabile a tutti</option><option value="NONE">Non abbinabile</option><option value="SELECTED">Solo ai servizi selezionati (configurabili dopo la creazione)</option></select></label>
                 <button className="primary-button">Crea servizio</button>
               </form>
             ) : (
@@ -235,15 +238,15 @@ export default async function ServicesPage() {
       <section className="list-section">
         <h2>Listino per categoria</h2>
         {categorizedCatalog.length ? (
-          <div className="data-list">
+          <div className="data-list compact-service-categories">
             {categorizedCatalog.map((category) => (
-              <section className="panel" key={category.id}>
-                <p className="eyebrow">Categoria</p>
-                <h2>{category.name}</h2>
+              <details className="panel compact-service-category" key={category.id}>
+                <summary><strong>{category.name}</strong><small>{category.services.length} servizi</small></summary>
+                <div className="compact-service-category-body">
                 {category.services.length ? (
                   <div className="data-list">
                     {category.services.map((item) => (
-                      <article className="data-row" key={item.id}>
+                      <article className="data-row compact-service-row" key={item.id}>
                         <div>
                           <h3>{item.name}</h3>
                           <p className="muted">
@@ -258,7 +261,6 @@ export default async function ServicesPage() {
                             · {item.onlineBookable ? "Online" : "Solo interno"}
                             {item.capacity > 1 ? ` · ${item.capacity} posti${item.waitlistEnabled ? " · lista d’attesa attiva" : ""}` : ""}
                           </p>
-                          {item.description ? <p>{item.description}</p> : null}
                           <details className="edit-disclosure">
                             <summary>Modifica servizio</summary>
                             <form
@@ -349,6 +351,8 @@ export default async function ServicesPage() {
                               <label>Posti disponibili<input name="capacity" type="number" min="1" max="500" defaultValue={item.capacity}/></label>
                               <label className="checkbox-row"><input name="waitlistEnabled" type="checkbox" defaultChecked={item.waitlistEnabled}/> Attiva lista d’attesa quando i posti terminano</label>
                               <label className="checkbox-row"><input name="addsDuration" type="checkbox" defaultChecked={item.addsDuration}/> Come servizio aggiuntivo, aumenta anche la durata</label>
+                              <label>Abbinamento con altri servizi<select name="additionalServiceMode" defaultValue={item.additionalServiceMode}><option value="ALL">Abbinabile a tutti</option><option value="NONE">Non abbinabile</option><option value="SELECTED">Solo ai servizi selezionati</option></select></label>
+                              <details className="service-category"><summary>Servizi compatibili<span>Usati con “solo selezionati”</span></summary><div className="category-chips">{catalog.filter(option => option.id !== item.id).map(option => <label className="checkbox-row" key={option.id}><input type="checkbox" name="compatibleServiceIds" value={option.id} defaultChecked={compatibilityLinks.some(link => link.primaryServiceId === item.id && link.additionalServiceId === option.id)}/>{option.name}</label>)}</div></details>
                               <label>Tempo per confermare il posto (minuti)<input name="waitlistConfirmationMinutes" type="number" min="15" max="10080" defaultValue={item.waitlistConfirmationMinutes}/></label>
                               <button className="ghost-button">
                                 Salva modifiche
@@ -378,7 +382,8 @@ export default async function ServicesPage() {
                     Nessun servizio in questa categoria.
                   </div>
                 )}
-              </section>
+                </div>
+              </details>
             ))}
           </div>
         ) : (

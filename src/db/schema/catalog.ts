@@ -65,6 +65,7 @@ export const services = pgTable(
       .notNull()
       .default(120),
     addsDuration: boolean("adds_duration").notNull().default(true),
+    additionalServiceMode: text("additional_service_mode").notNull().default("ALL"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -81,6 +82,12 @@ export const services = pgTable(
     ),
   ],
 );
+
+export const serviceAdditionalCompatibilities = pgTable("service_additional_compatibilities", {
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  primaryServiceId: uuid("primary_service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  additionalServiceId: uuid("additional_service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+}, table => [uniqueIndex("service_additional_compatibility_unique").on(table.primaryServiceId, table.additionalServiceId), index("service_additional_compatibility_business_idx").on(table.businessId)]);
 
 export const staffMembers = pgTable(
   "staff_members",

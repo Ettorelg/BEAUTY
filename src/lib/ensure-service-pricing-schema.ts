@@ -36,6 +36,9 @@ export function ensureServicePricingSchema() {
       ),
     );
     await db.execute(sql.raw("ALTER TABLE services ADD COLUMN IF NOT EXISTS adds_duration boolean NOT NULL DEFAULT true"));
+    await db.execute(sql.raw("ALTER TABLE services ADD COLUMN IF NOT EXISTS additional_service_mode text NOT NULL DEFAULT 'ALL'"));
+    await db.execute(sql.raw("CREATE TABLE IF NOT EXISTS service_additional_compatibilities (business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE, primary_service_id uuid NOT NULL REFERENCES services(id) ON DELETE CASCADE, additional_service_id uuid NOT NULL REFERENCES services(id) ON DELETE CASCADE)"));
+    await db.execute(sql.raw("CREATE UNIQUE INDEX IF NOT EXISTS service_additional_compatibility_unique ON service_additional_compatibilities(primary_service_id, additional_service_id)"));
     await db.execute(
       sql.raw(`CREATE TABLE IF NOT EXISTS service_waitlist (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,

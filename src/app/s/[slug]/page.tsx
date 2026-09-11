@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import {
   businesses,
   serviceCategories,
+  serviceAdditionalCompatibilities,
   services,
   staffMembers,
   staffServices,
@@ -151,6 +152,7 @@ export default async function Page({
       capacity:services.capacity,
       waitlistEnabled:services.waitlistEnabled,
       addsDuration: services.addsDuration,
+      additionalServiceMode: services.additionalServiceMode,
       category: serviceCategories.name,
     })
     .from(services)
@@ -171,7 +173,8 @@ export default async function Page({
     )
     .orderBy(asc(serviceCategories.sortOrder), asc(services.name));
   const service = catalog.find((x) => x.id === q.service);
-  const selectedExtraIds = [...new Set((q.extras ?? "").split(",").filter(Boolean))].filter(id => id !== service?.id && catalog.some(item => item.id === id)).slice(0, 5);
+  const allowedAdditionalIds = service?.additionalServiceMode === "SELECTED" ? (await db.select({ id: serviceAdditionalCompatibilities.additionalServiceId }).from(serviceAdditionalCompatibilities).where(and(eq(serviceAdditionalCompatibilities.businessId, b.id), eq(serviceAdditionalCompatibilities.primaryServiceId, service.id)))).map(item => item.id) : [];
+  const selectedExtraIds = [...new Set((q.extras ?? "").split(",").filter(Boolean))].filter(id => id !== service?.id && catalog.some(item => item.id === id) && service?.additionalServiceMode !== "NONE" && (service?.additionalServiceMode === "ALL" || allowedAdditionalIds.includes(id))).slice(0, 5);
   const selectedExtras = catalog.filter(item => selectedExtraIds.includes(item.id));
   const extraDuration = selectedExtras.filter(item => item.addsDuration).reduce((sum, item) => sum + item.duration, 0);
   const extraPrice = selectedExtras.reduce((sum, item) => sum + Number(item.price), 0);
@@ -214,7 +217,7 @@ export default async function Page({
   const supportsExtras = (candidateStaffId: string) => selectedExtraIds.every(id => extraAssignments.some(link => link.staffId === candidateStaffId && link.serviceId === id));
   const candidateStaffIds = staffId ? [staffId] : staff.map(member => member.id);
   const selectedCombinationCompatible = candidateStaffIds.some(candidateStaffId => supportsExtras(candidateStaffId));
-  const compatibleExtraCatalog = service ? catalog.filter(item => item.id !== service.id && (selectedExtraIds.includes(item.id) || candidateStaffIds.some(candidateStaffId => supportsExtras(candidateStaffId) && extraAssignments.some(link => link.staffId === candidateStaffId && link.serviceId === item.id)))) : [];
+  const compatibleExtraCatalog = service ? catalog.filter(item => item.id !== service.id && (selectedExtraIds.includes(item.id) || (service.additionalServiceMode !== "NONE" && (service.additionalServiceMode === "ALL" || allowedAdditionalIds.includes(item.id)) && candidateStaffIds.some(candidateStaffId => supportsExtras(candidateStaffId) && extraAssignments.some(link => link.staffId === candidateStaffId && link.serviceId === item.id))))) : [];
   const selectedDayStart=zonedLocalToUtc(`${date}T00:00`,b.timezone),selectedDayEnd=zonedLocalToUtc(`${after(date,1)}T00:00`,b.timezone);
   const bookedForDay=service&&service.capacity>1?await db.select({staffId:appointments.staffId,startsAt:appointments.startsAt,staffName:staffMembers.name}).from(appointments).innerJoin(staffMembers,eq(staffMembers.id,appointments.staffId)).where(and(eq(appointments.businessId,b.id),eq(appointments.serviceId,service.id),inArray(appointments.status,["BOOKED","CONFIRMED","ARRIVED"]),gte(appointments.startsAt,selectedDayStart),lt(appointments.startsAt,selectedDayEnd),staffId?eq(appointments.staffId,staffId):undefined)):[];
   const fullCourseSlots=service?Array.from(bookedForDay.reduce((map,item)=>{const key=`${item.staffId}|${item.startsAt.toISOString()}`,group=map.get(key)??{...item,count:0};group.count++;map.set(key,group);return map},new Map<string,{staffId:string;startsAt:Date;staffName:string;count:number}>()).values()).filter(item=>item.count>=service.capacity):[];
