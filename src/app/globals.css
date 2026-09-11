@@ -704,6 +704,4 @@ body:has(.agenda-shell) > .site-footer { display:none; }
   .landing-feature-grid article { min-height: 0; }
   .landing-access-grid h3, .landing-access-grid p { min-height: 0; }
 }
-.whatsapp-connect-qr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;padding:20px;border:1px solid #e4ddd8;border-radius:18px;background:#f8f5f3}
-.whatsapp-connect-qr h3{margin:0 0 8px}.whatsapp-connect-qr .primary-button{display:inline-flex;margin-top:8px}.whatsapp-connect-qr-code{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;border-radius:14px;background:#fff;color:#201c1a;text-align:center}.whatsapp-connect-qr-code svg{display:block;max-width:100%;height:auto}
-@media(max-width:640px){.whatsapp-connect-qr{grid-template-columns:1fr}.whatsapp-connect-qr-code{justify-self:center}}
+.technical-settings{border-top:1px solid #e4ddd8;padding-top:10px}.technical-settings>summary{cursor:pointer;color:#756a65;font-size:.82rem;font-weight:700}.technical-settings>div{margin-top:12px}
