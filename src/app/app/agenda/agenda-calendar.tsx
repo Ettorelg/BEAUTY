@@ -1363,7 +1363,18 @@ export function AgendaCalendar({ today }: { today: string }) {
                                 ) : null}
                                 <details className="agenda-modal-section">
                                   <summary>Sposta data o operatore</summary>
-                                  <form action={rescheduleAppointment}>
+                                  <form action={async formData => {
+                                    setReschedulePending(entry.id);
+                                    const result = await rescheduleAppointment(formData);
+                                    setReschedulePending("");
+                                    if (!result.ok) {
+                                      setError(result.error);
+                                      return;
+                                    }
+                                    setError("");
+                                    setEditFor("");
+                                    await load();
+                                  }}>
                                     <input
                                       type="hidden"
                                       name="id"
@@ -1402,8 +1413,8 @@ export function AgendaCalendar({ today }: { today: string }) {
                                         </select>
                                       </label>
                                     ) : null}
-                                    <button className="ghost-button">
-                                      Invia proposta al cliente
+                                    <button className="ghost-button" disabled={reschedulePending === entry.id}>
+                                      {reschedulePending === entry.id ? "Verifica…" : "Invia proposta al cliente"}
                                     </button>
                                   </form>
                                 </details>

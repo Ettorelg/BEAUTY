@@ -224,8 +224,9 @@ export async function changeAppointmentService(formData: FormData) {
   revalidatePath("/app/agenda");
 }
 export async function rescheduleAppointment(formData: FormData) {
-  const context = await requireBusinessContext();
-  const input = z.object({ id: z.string().uuid(), startsAt: z.string().min(16), staffId: z.string().uuid().optional() }).parse(Object.fromEntries(formData));
+  try {
+    const context = await requireBusinessContext();
+    const input = z.object({ id: z.string().uuid(), startsAt: z.string().min(16), staffId: z.string().uuid().optional() }).parse(Object.fromEntries(formData));
   const ownStaffId = context.role === "STAFF" ? await staffIdForCurrentUser(context.businessId, context.user.id) : undefined;
   if (context.role === "STAFF" && !ownStaffId) throw new Error("Profilo operatore non collegato.");
   await db.transaction(async (tx) => {
@@ -265,7 +266,11 @@ export async function rescheduleAppointment(formData: FormData) {
     if (!customer?.email) throw new Error("Il cliente non ha un’email: non è possibile richiedere l’approvazione online.");
     return { customerEmail: customer.email, serviceName: current.serviceName, startsAt, endsAt, staffId: targetStaffId, version: current.version };
   }).then(async proposal => { const request = await createRescheduleRequest({ appointmentId: input.id, businessId: context.businessId, staffId: proposal.staffId, startsAt: proposal.startsAt, endsAt: proposal.endsAt, version: proposal.version, proposerType: "STAFF", proposedBy: context.user.id }); await sendRescheduleApprovalEmail({ email: proposal.customerEmail, businessName: context.businessName, serviceName: proposal.serviceName, startsAt: proposal.startsAt, timezone: context.timezone, token: request.token! }); });
-  revalidatePath("/app/agenda");
+    revalidatePath("/app/agenda");
+    return { ok: true as const };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Impossibile proporre lo spostamento." };
+  }
 }
 
 export async function approveCustomerRescheduleRequest(formData: FormData) {
