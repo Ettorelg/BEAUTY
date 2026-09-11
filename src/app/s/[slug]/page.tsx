@@ -39,7 +39,7 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ service?: string; date?: string; staff?: string;waitlist?:string }>;
+  searchParams: Promise<{ service?: string; date?: string; staff?: string;waitlist?:string; extras?: string }>;
 }) {
   const [{ slug }, q] = await Promise.all([params, searchParams]);
   const [b] = await db
@@ -150,6 +150,7 @@ export default async function Page({
       repeatDurationMinutes: services.repeatDurationMinutes,
       capacity:services.capacity,
       waitlistEnabled:services.waitlistEnabled,
+      addsDuration: services.addsDuration,
       category: serviceCategories.name,
     })
     .from(services)
@@ -170,6 +171,10 @@ export default async function Page({
     )
     .orderBy(asc(serviceCategories.sortOrder), asc(services.name));
   const service = catalog.find((x) => x.id === q.service);
+  const selectedExtraIds = [...new Set((q.extras ?? "").split(",").filter(Boolean))].filter(id => id !== service?.id && catalog.some(item => item.id === id)).slice(0, 5);
+  const selectedExtras = catalog.filter(item => selectedExtraIds.includes(item.id));
+  const extraDuration = selectedExtras.filter(item => item.addsDuration).reduce((sum, item) => sum + item.duration, 0);
+  const extraPrice = selectedExtras.reduce((sum, item) => sum + Number(item.price), 0);
   const usablePoints =
     card?.expiresAt && card.expiresAt < now ? 0 : (card?.points ?? 0);
   const availableBonusRules =
@@ -205,6 +210,8 @@ export default async function Page({
         .orderBy(asc(staffMembers.name))
     : [];
   const staffId = staff.some((x) => x.id === q.staff) ? q.staff : undefined;
+  const extraAssignments = selectedExtraIds.length ? await db.select({ staffId: staffServices.staffId, serviceId: staffServices.serviceId }).from(staffServices).where(and(eq(staffServices.businessId, b.id), inArray(staffServices.serviceId, selectedExtraIds))) : [];
+  const supportsExtras = (candidateStaffId: string) => selectedExtraIds.every(id => extraAssignments.some(link => link.staffId === candidateStaffId && link.serviceId === id));
   const selectedDayStart=zonedLocalToUtc(`${date}T00:00`,b.timezone),selectedDayEnd=zonedLocalToUtc(`${after(date,1)}T00:00`,b.timezone);
   const bookedForDay=service&&service.capacity>1?await db.select({staffId:appointments.staffId,startsAt:appointments.startsAt,staffName:staffMembers.name}).from(appointments).innerJoin(staffMembers,eq(staffMembers.id,appointments.staffId)).where(and(eq(appointments.businessId,b.id),eq(appointments.serviceId,service.id),inArray(appointments.status,["BOOKED","CONFIRMED","ARRIVED"]),gte(appointments.startsAt,selectedDayStart),lt(appointments.startsAt,selectedDayEnd),staffId?eq(appointments.staffId,staffId):undefined)):[];
   const fullCourseSlots=service?Array.from(bookedForDay.reduce((map,item)=>{const key=`${item.staffId}|${item.startsAt.toISOString()}`,group=map.get(key)??{...item,count:0};group.count++;map.set(key,group);return map},new Map<string,{staffId:string;startsAt:Date;staffName:string;count:number}>()).values()).filter(item=>item.count>=service.capacity):[];
@@ -213,16 +220,17 @@ export default async function Page({
         businessId: b.id,
         serviceId: service.id,
         date,
-        durationMinutes:
+        durationMinutes: (
           completedServiceIds.has(service.id) &&
           service.repeatDurationMinutes != null
             ? service.repeatDurationMinutes
-            : service.duration,
+            : service.duration) + extraDuration,
         timezone: b.timezone,
         capacity:service.capacity,
       })
     : [];
   if (staffId) slots = slots.filter((x) => x.staffId === staffId);
+  slots = slots.filter(x => supportsExtras(x.staffId));
   if (service && !slots.length && !service.waitlistEnabled)
     for (let i = 1; i <= 30 && !slots.length; i++) {
       const candidate = after(date, i);
@@ -230,15 +238,16 @@ export default async function Page({
         businessId: b.id,
         serviceId: service.id,
         date: candidate,
-        durationMinutes:
+        durationMinutes: (
           completedServiceIds.has(service.id) &&
           service.repeatDurationMinutes != null
             ? service.repeatDurationMinutes
-            : service.duration,
+            : service.duration) + extraDuration,
         timezone: b.timezone,
         capacity:service.capacity,
       });
       if (staffId) found = found.filter((x) => x.staffId === staffId);
+      found = found.filter(x => supportsExtras(x.staffId));
       if (found.length) {
         date = candidate;
         slots = found;
@@ -443,12 +452,14 @@ export default async function Page({
             <h2>2. Scegli quando e con chi</h2>
             <BookingFilters
               slug={slug}
-              serviceId={service.id}
+      serviceId={service.id}
               date={date}
               staffId={staffId}
               staff={staff}
               minimumDate={today}
+              extras={selectedExtraIds.join(",")}
             />
+            <details className="service-category"><summary>Aggiungi altri servizi<span>{selectedExtras.length ? `${selectedExtras.length} selezionati` : "Facoltativo"}</span></summary><div className="service-grid">{catalog.filter(item => item.id !== service.id).map(item => { const active = selectedExtraIds.includes(item.id); const next = active ? selectedExtraIds.filter(id => id !== item.id) : [...selectedExtraIds, item.id].slice(0, 5); const query = new URLSearchParams({ service: service.id, date }); if (staffId) query.set("staff", staffId); if (next.length) query.set("extras", next.join(",")); return <Link className={`service-card ${active ? "selected" : ""}`} href={`/s/${slug}?${query}`} key={item.id}><strong>{active ? "✓ " : "+ "}{item.name}</strong><p>€ {Number(item.price).toFixed(2)} · {item.addsDuration ? `+${item.duration} min` : "nessun tempo aggiuntivo"}</p></Link>})}</div></details>
             {compact.length ? (
               <>
                 <p className="muted">
@@ -474,6 +485,9 @@ export default async function Page({
                     promotionByService.get(service.id)?.discount ?? 0
                   }
                   allowRewardStacking={loyalty?.allowRewardStacking ?? false}
+                  additionalServiceIds={selectedExtraIds}
+                  additionalPrice={extraPrice}
+                  additionalDuration={extraDuration}
                 />
               </>
             ) : (
@@ -482,8 +496,8 @@ export default async function Page({
               </p>
             )}
             {q.waitlist?<p className="success-message">Iscrizione alla lista d’attesa registrata. Riceverai un’email se si libera un posto.</p>:null}
-            {service.waitlistEnabled && !compact.length ? <details className="service-category waitlist-panel" open><summary>Lista d’attesa per la giornata<span>{date}</span></summary><form action={joinDayWaitlist} className="compact-form stacked panel"><input type="hidden" name="slug" value={slug}/><input type="hidden" name="serviceId" value={service.id}/><input type="hidden" name="date" value={date}/><input type="hidden" name="staffId" value={staffId ?? ""}/><p>Nessun orario disponibile. Iscriviti e riceverai automaticamente un’email appena si libera un posto{staffId ? " con l’operatore scelto" : " con qualsiasi operatore"}.</p><input name="customerName" defaultValue={session?.user.name??""} placeholder="Nome e cognome" required/><input name="email" type="email" defaultValue={session?.user.email??""} placeholder="Email" required/><input name="phone" defaultValue={profile?.phone??""} placeholder="Telefono" required/><button className="primary-button">Avvisami se si libera un posto</button></form></details> : null}
-            {service.waitlistEnabled&&fullCourseSlots.length?<details className="service-category waitlist-panel"><summary>Iscriviti alla lista d’attesa<span>{fullCourseSlots.length} orari completi</span></summary><div className="service-grid">{fullCourseSlots.map(slot=><form action={joinServiceWaitlist} className="compact-form stacked panel" key={`${slot.staffId}-${slot.startsAt.toISOString()}`}><input type="hidden" name="slug" value={slug}/><input type="hidden" name="serviceId" value={service.id}/><input type="hidden" name="staffId" value={slot.staffId}/><input type="hidden" name="startsAt" value={slot.startsAt.toLocaleString("sv-SE",{timeZone:b.timezone}).replace(" ","T").slice(0,16)}/><strong>{slot.startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:b.timezone})} · {slot.staffName}</strong><input name="customerName" defaultValue={session?.user.name??""} placeholder="Nome e cognome" required/><input name="email" type="email" defaultValue={session?.user.email??""} placeholder="Email" required/><input name="phone" defaultValue={profile?.phone??""} placeholder="Telefono" required/><button className="primary-button">Entra in lista d’attesa</button></form>)}</div></details>:null}
+            {service.waitlistEnabled && !selectedExtras.length && !compact.length ? <details className="service-category waitlist-panel" open><summary>Lista d’attesa per la giornata<span>{date}</span></summary><form action={joinDayWaitlist} className="compact-form stacked panel"><input type="hidden" name="slug" value={slug}/><input type="hidden" name="serviceId" value={service.id}/><input type="hidden" name="date" value={date}/><input type="hidden" name="staffId" value={staffId ?? ""}/><p>Nessun orario disponibile. Iscriviti e riceverai automaticamente un’email appena si libera un posto{staffId ? " con l’operatore scelto" : " con qualsiasi operatore"}.</p><input name="customerName" defaultValue={session?.user.name??""} placeholder="Nome e cognome" required/><input name="email" type="email" defaultValue={session?.user.email??""} placeholder="Email" required/><input name="phone" defaultValue={profile?.phone??""} placeholder="Telefono" required/><button className="primary-button">Avvisami se si libera un posto</button></form></details> : null}
+            {service.waitlistEnabled&&!selectedExtras.length&&fullCourseSlots.length?<details className="service-category waitlist-panel"><summary>Iscriviti alla lista d’attesa<span>{fullCourseSlots.length} orari completi</span></summary><div className="service-grid">{fullCourseSlots.map(slot=><form action={joinServiceWaitlist} className="compact-form stacked panel" key={`${slot.staffId}-${slot.startsAt.toISOString()}`}><input type="hidden" name="slug" value={slug}/><input type="hidden" name="serviceId" value={service.id}/><input type="hidden" name="staffId" value={slot.staffId}/><input type="hidden" name="startsAt" value={slot.startsAt.toLocaleString("sv-SE",{timeZone:b.timezone}).replace(" ","T").slice(0,16)}/><strong>{slot.startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:b.timezone})} · {slot.staffName}</strong><input name="customerName" defaultValue={session?.user.name??""} placeholder="Nome e cognome" required/><input name="email" type="email" defaultValue={session?.user.email??""} placeholder="Email" required/><input name="phone" defaultValue={profile?.phone??""} placeholder="Telefono" required/><button className="primary-button">Entra in lista d’attesa</button></form>)}</div></details>:null}
           </div>
         ) : (
           <aside className="booking-panel empty-prompt">

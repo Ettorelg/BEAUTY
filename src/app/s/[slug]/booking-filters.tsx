@@ -3,13 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function BookingFilters({ slug, serviceId, date, staffId, staff, minimumDate }: {
+export function BookingFilters({ slug, serviceId, date, staffId, staff, minimumDate, extras }: {
   slug: string;
   serviceId: string;
   date: string;
   staffId?: string;
   staff: Array<{ id: string; name: string }>;
   minimumDate: string;
+  extras?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -18,6 +19,7 @@ export function BookingFilters({ slug, serviceId, date, staffId, staff, minimumD
     setLoading(true);
     const query = new URLSearchParams({ service: serviceId, date: nextDate });
     if (nextStaffId) query.set("staff", nextStaffId);
+    if (extras) query.set("extras", extras);
     router.push(`/s/${slug}?${query}`);
   }
 

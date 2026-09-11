@@ -16,7 +16,7 @@ function rewardLabel(reward: Reward) {
   return `${reward.points} punti · ${euro(reward.value / 100)} di sconto`;
 }
 
-export function BookingDetailsForm({ action, slug, serviceId, slots, name, email, phone, rewards, basePrice, promotionDiscount, allowRewardStacking }: {
+export function BookingDetailsForm({ action, slug, serviceId, slots, name, email, phone, rewards, basePrice, promotionDiscount, allowRewardStacking, additionalServiceIds, additionalPrice, additionalDuration }: {
   action: (formData: FormData) => void | Promise<void>;
   slug: string;
   serviceId: string;
@@ -28,6 +28,9 @@ export function BookingDetailsForm({ action, slug, serviceId, slots, name, email
   basePrice: number;
   promotionDiscount: number;
   allowRewardStacking: boolean;
+  additionalServiceIds: string[];
+  additionalPrice: number;
+  additionalDuration: number;
 }) {
   const [selected, setSelected] = useState("");
   const [guest, setGuest] = useState(false);
@@ -37,7 +40,7 @@ export function BookingDetailsForm({ action, slug, serviceId, slots, name, email
   const canAuto = logged && phone.trim().length >= 6;
   const accountName = name.trim() || email.split("@")[0] || "Cliente";
   const reward = rewards.find((item) => item.id === rewardId);
-  const price = useMemo(() => calculateBookingPriceCents(Math.round(basePrice * 100), promotionDiscount, reward, allowRewardStacking) / 100, [basePrice, promotionDiscount, reward, allowRewardStacking]);
+  const price = useMemo(() => calculateBookingPriceCents(Math.round(basePrice * 100), promotionDiscount, reward, allowRewardStacking) / 100 + additionalPrice, [basePrice, promotionDiscount, reward, allowRewardStacking, additionalPrice]);
   const selectedSlot = slots.find((slot) => slot.localStart === selected);
 
   async function google() {
@@ -47,6 +50,7 @@ export function BookingDetailsForm({ action, slug, serviceId, slots, name, email
   return <form ref={ref} action={action} className="public-booking-form">
     <input type="hidden" name="slug" value={slug}/>
     <input type="hidden" name="serviceId" value={serviceId}/>
+    <input type="hidden" name="additionalServiceIds" value={additionalServiceIds.join(",")}/>
     <input type="hidden" name="idempotencyKey" value={crypto.randomUUID()}/>
     {canAuto ? <><input type="hidden" name="customerName" value={accountName}/><input type="hidden" name="email" value={email}/><input type="hidden" name="phone" value={phone}/></> : null}
 
@@ -68,6 +72,7 @@ export function BookingDetailsForm({ action, slug, serviceId, slots, name, email
         <select name="rewardRuleId" value={rewardId} onChange={(event) => setRewardId(event.target.value)}><option value="">Non usare punti</option>{rewards.map((item) => <option value={item.id} key={item.id}>{rewardLabel(item)}</option>)}</select>
       </section> : null}
       {selected ? <p className="booking-final-price"><span>Totale prenotazione</span><strong>{euro(price)}</strong></p> : null}
+      {selected && additionalServiceIds.length ? <p className="muted">{additionalServiceIds.length} servizi aggiuntivi · {additionalDuration ? `+${additionalDuration} minuti` : "nessun tempo aggiuntivo"}</p> : null}
 
       {selected && !guest ? <section className="booking-confirm-actions">
         {canAuto ? <><p className="muted">Prenoti come <strong>{accountName}</strong>.</p><button className="primary-button">Conferma prenotazione</button></> : <>

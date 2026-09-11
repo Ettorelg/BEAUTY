@@ -35,6 +35,7 @@ export function ensureServicePricingSchema() {
         "ALTER TABLE services ADD COLUMN IF NOT EXISTS waitlist_confirmation_minutes integer NOT NULL DEFAULT 120",
       ),
     );
+    await db.execute(sql.raw("ALTER TABLE services ADD COLUMN IF NOT EXISTS adds_duration boolean NOT NULL DEFAULT true"));
     await db.execute(
       sql.raw(`CREATE TABLE IF NOT EXISTS service_waitlist (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,

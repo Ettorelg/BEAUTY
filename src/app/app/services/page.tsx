@@ -41,6 +41,7 @@ export default async function ServicesPage() {
       capacity: services.capacity,
       waitlistEnabled: services.waitlistEnabled,
       waitlistConfirmationMinutes: services.waitlistConfirmationMinutes,
+      addsDuration: services.addsDuration,
       categoryName: serviceCategories.name,
     })
     .from(services)
@@ -216,6 +217,7 @@ export default async function ServicesPage() {
                   <input name="onlineBookable" type="checkbox" defaultChecked />{" "}
                   Prenotabile online
                 </label>
+                <label className="checkbox-row"><input name="addsDuration" type="checkbox" defaultChecked/> Se aggiunto a un’altra prenotazione, aumenta anche la durata</label>
                 <button className="primary-button">Crea servizio</button>
               </form>
             ) : (
@@ -346,6 +348,7 @@ export default async function ServicesPage() {
                               </label>
                               <label>Posti disponibili<input name="capacity" type="number" min="1" max="500" defaultValue={item.capacity}/></label>
                               <label className="checkbox-row"><input name="waitlistEnabled" type="checkbox" defaultChecked={item.waitlistEnabled}/> Attiva lista d’attesa quando i posti terminano</label>
+                              <label className="checkbox-row"><input name="addsDuration" type="checkbox" defaultChecked={item.addsDuration}/> Come servizio aggiuntivo, aumenta anche la durata</label>
                               <label>Tempo per confermare il posto (minuti)<input name="waitlistConfirmationMinutes" type="number" min="15" max="10080" defaultValue={item.waitlistConfirmationMinutes}/></label>
                               <button className="ghost-button">
                                 Salva modifiche

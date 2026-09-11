@@ -34,6 +34,7 @@ const serviceSchema = z.object({
   capacity: z.coerce.number().int().min(1).max(500),
   waitlistEnabled: z.coerce.boolean(),
   waitlistConfirmationMinutes: z.coerce.number().int().min(15).max(10080),
+  addsDuration: z.coerce.boolean(),
 });
 
 function ownerOnly(role: string) {
@@ -83,6 +84,7 @@ export async function createService(formData: FormData) {
     waitlistEnabled: formData.get("waitlistEnabled") === "on",
     waitlistConfirmationMinutes:
       formData.get("waitlistConfirmationMinutes") || 120,
+    addsDuration: formData.get("addsDuration") === "on",
   });
   const [category] = await db
     .select({ id: serviceCategories.id })
@@ -110,6 +112,7 @@ export async function createService(formData: FormData) {
     capacity: input.capacity,
     waitlistEnabled: input.waitlistEnabled,
     waitlistConfirmationMinutes: input.waitlistConfirmationMinutes,
+    addsDuration: input.addsDuration,
   });
   refreshServicePages();
 }
@@ -133,6 +136,7 @@ export async function updateService(formData: FormData) {
     waitlistEnabled: formData.get("waitlistEnabled") === "on",
     waitlistConfirmationMinutes:
       formData.get("waitlistConfirmationMinutes") || 120,
+    addsDuration: formData.get("addsDuration") === "on",
   });
   const [category] = await db
     .select({ id: serviceCategories.id })
@@ -160,6 +164,7 @@ export async function updateService(formData: FormData) {
       capacity: input.capacity,
       waitlistEnabled: input.waitlistEnabled,
       waitlistConfirmationMinutes: input.waitlistConfirmationMinutes,
+      addsDuration: input.addsDuration,
       updatedAt: new Date(),
     })
     .where(

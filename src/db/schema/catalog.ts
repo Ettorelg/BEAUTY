@@ -64,6 +64,7 @@ export const services = pgTable(
     waitlistConfirmationMinutes: integer("waitlist_confirmation_minutes")
       .notNull()
       .default(120),
+    addsDuration: boolean("adds_duration").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

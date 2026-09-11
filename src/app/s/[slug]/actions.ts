@@ -1,12 +1,13 @@
 "use server";
 
-import { and, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
   appointmentEvents,
+  appointmentAdditionalServices,
   appointments,
   businesses,
   customerRelations,
@@ -25,6 +26,7 @@ import {
 import { auth } from "@/lib/auth";
 import { sendBookingConfirmation } from "@/lib/staff-invitations";
 import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
+import { ensureAdditionalServicesSchema } from "@/lib/ensure-additional-services-schema";
 import { getPublicAvailability } from "@/modules/availability/application/public-availability";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 import { calculateBookingPriceCents } from "@/modules/fidelity/domain/booking-price";
@@ -51,10 +53,12 @@ const schema = z.object({
     (value) => (value === "" ? undefined : value),
     z.string().uuid().optional(),
   ),
+  additionalServiceIds: z.preprocess((value) => typeof value === "string" && value ? value.split(",") : [], z.array(z.string().uuid()).max(5)),
 });
 
 export async function createPublicAppointment(formData: FormData) {
   await ensureServicePricingSchema();
+  await ensureAdditionalServicesSchema();
   const input = schema.parse(Object.fromEntries(formData));
   const session = await auth.api.getSession({ headers: await headers() });
   const { staffId, startsAt: localStart } = input.selection;
@@ -104,13 +108,17 @@ export async function createPublicAppointment(formData: FormData) {
     .where(eq(businesses.slug, input.slug))
     .limit(1);
   if (!selection) throw Error("Prenotazione non valida.");
+  const extraIds = [...new Set(input.additionalServiceIds)].filter(id => id !== input.serviceId);
+  const extras = extraIds.length ? await db.select({ id: services.id, name: services.name, duration: services.durationMinutes, price: services.price, addsDuration: services.addsDuration }).from(services).innerJoin(staffServices, and(eq(staffServices.serviceId, services.id), eq(staffServices.staffId, staffId), eq(staffServices.businessId, selection.businessId))).where(and(eq(services.businessId, selection.businessId), eq(services.active, true), eq(services.onlineBookable, true), inArray(services.id, extraIds))) : [];
+  if (extras.length !== extraIds.length) throw Error("Uno dei servizi aggiuntivi non è disponibile con questo operatore.");
+  const extraDuration = extras.filter(item => item.addsDuration).reduce((sum, item) => sum + item.duration, 0);
 
   const date = localStart.slice(0, 10);
   const slots = await getPublicAvailability({
     businessId: selection.businessId,
     serviceId: input.serviceId,
     date,
-    durationMinutes: selection.duration,
+    durationMinutes: selection.duration + extraDuration,
     timezone: selection.timezone,
     capacity: selection.capacity,
   });
@@ -213,10 +221,11 @@ export async function createPublicAppointment(formData: FormData) {
         ),
       )
       .limit(1);
-    const effectiveDuration =
+    const primaryDuration =
       previousService && selection.repeatDuration != null
         ? selection.repeatDuration
         : selection.duration;
+    const effectiveDuration = primaryDuration + extraDuration;
     const effectiveSlots = await getPublicAvailability({
       businessId: selection.businessId,
       serviceId: input.serviceId,
@@ -304,7 +313,6 @@ export async function createPublicAppointment(formData: FormData) {
         fidelityConfig?.allowRewardStacking ?? false,
       );
     }
-
     const [created] = await tx
       .insert(appointments)
       .values({
@@ -327,6 +335,7 @@ export async function createPublicAppointment(formData: FormData) {
       })
       .returning({ id: appointments.id });
     if (!created) throw Error("Prenotazione già registrata.");
+    if (extras.length) await tx.insert(appointmentAdditionalServices).values(extras.map(item => ({ businessId: selection.businessId, appointmentId: created.id, serviceId: item.id, serviceName: item.name, durationMinutes: item.addsDuration ? item.duration : 0, price: String(item.price) })));
 
     if (reward) {
       const [updatedCard] = await tx
@@ -371,7 +380,7 @@ export async function createPublicAppointment(formData: FormData) {
   await sendBookingConfirmation({
     email: input.email,
     businessName: selection.businessName ?? input.slug,
-    serviceName: selection.serviceName,
+    serviceName: [selection.serviceName, ...extras.map(item => item.name)].join(" + "),
     startsAt,
     timezone: selection.timezone,
     address: selection.address,
