@@ -1,4 +1,4 @@
-import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { index, integer, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./identity";
 import { services, staffMembers } from "./catalog";
 import { businesses, locations } from "./tenancy";
@@ -39,6 +39,7 @@ export const appointments = pgTable(
     timezone: text("timezone").notNull(),
     status: text("status").notNull().default("BOOKED"),
     paymentStatus: text("payment_status").notNull().default("NOT_DUE"),
+    amountPaid: numeric("amount_paid", { precision: 10, scale: 2 }).notNull().default("0"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     notes: text("notes"),
     source: text("source").notNull().default("BACKOFFICE"),
@@ -70,6 +71,22 @@ export const appointmentEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("appointment_events_appointment_idx").on(table.appointmentId)],
+);
+
+export const appointmentPayments = pgTable(
+  "appointment_payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+    appointmentId: uuid("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+    amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+    method: text("method").notNull().default("CASH"),
+    note: text("note"),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    paidAt: timestamp("paid_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("appointment_payments_appointment_idx").on(table.appointmentId)],
 );
 
 export const appointmentAdditionalServices=pgTable("appointment_additional_services",{id:uuid("id").primaryKey().defaultRandom(),businessId:uuid("business_id").notNull().references(()=>businesses.id,{onDelete:"cascade"}),appointmentId:uuid("appointment_id").notNull().references(()=>appointments.id,{onDelete:"cascade"}),serviceId:uuid("service_id").references(()=>services.id,{onDelete:"set null"}),serviceName:text("service_name").notNull(),durationMinutes:integer("duration_minutes").notNull(),price:text("price").notNull(),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow()},t=>[index("appointment_additional_services_appointment_idx").on(t.appointmentId)]);
