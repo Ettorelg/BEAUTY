@@ -329,10 +329,10 @@ export function AgendaCalendar({ today }: { today: string }) {
       })}
     </div> : data.view === "week" ? <div className="week-calendar">
       {Array.from({ length: 7 }, (_, index) => addCalendarDays(data.startDate, index)).map((day) => <section className={`week-day${day === today ? " today" : ""}`} key={day}>
-        <header>
+        <button className="week-day-heading" type="button" onClick={() => openDay(day)} aria-label={`Apri la giornata del ${day}`}>
           <span>{new Intl.DateTimeFormat("it-IT", { weekday: "short", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`))}</span>
           <strong>{day.slice(8)}</strong>
-        </header>
+        </button>
         {data.entries.filter((entry) => dayForEntry(entry) === day).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id}>
           <span>{time(entry.startsAt)}</span><strong>{entry.customerName}</strong><small>{entry.serviceName} · {entry.staffName}</small><small className="agenda-price">{money(Number(entry.price))}</small><em>{statusLabels[entry.status]}</em>{entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto assenza</strong> : null}
         </article>)}

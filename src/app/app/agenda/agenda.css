@@ -30,8 +30,9 @@
 .week-calendar { display: grid; grid-template-columns: repeat(7, minmax(190px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 10px; }
 .week-day { min-height: 480px; padding: 10px; border: 1px solid #e4ddd8; border-radius: 15px; background: white; }
 .week-day.today { border-color: var(--accent); box-shadow: 0 0 0 2px #6f51451a; }
-.week-day header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 5px; text-transform: capitalize; }
-.week-day header strong { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: #f0e8e4; color: var(--accent); font-size: .75rem; }
+.week-day-heading { width:100%; min-height:38px; display:flex; justify-content:space-between; align-items:center; margin:0 0 12px; padding:5px 7px; border:0; border-radius:9px; background:transparent; color:inherit; text-transform:capitalize; }
+.week-day-heading:hover,.week-day-heading:focus-visible { background:#f6f0ed; outline:none; }
+.week-day-heading strong { display:grid; width:28px; height:28px; place-items:center; border-radius:50%; background:#f0e8e4; color:var(--accent); font-size:.75rem; }
 
 .year-calendar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .year-month { min-width: 0; display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 3px 8px; padding: 14px; border: 1px solid #e4ddd8; border-radius: 13px; background: white; color: #302824; font: inherit; text-align: left; cursor: pointer; }
