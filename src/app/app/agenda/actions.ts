@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   appointmentEvents,
+  appointmentAdditionalServices,
   appointmentRescheduleRequests,
   appointments,
   customerRelations,
@@ -33,6 +34,7 @@ import { isAppointmentStatus } from "@/modules/appointments/domain/status";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 import { calculateEarnedPoints } from "@/modules/fidelity/domain/rewards";
 import { ensureInventorySchema } from "@/lib/ensure-inventory-schema";
+import { ensureAdditionalServicesSchema } from "@/lib/ensure-additional-services-schema";
 
 const finalStatuses = ["COMPLETED", "CANCELLED", "NO_SHOW"] as const;
 const bookingSchema = z.object({
@@ -355,6 +357,12 @@ export async function addCustomProductToAppointment(formData: FormData) {
   if (context.role === "STAFF") { const ownStaffId = await staffIdForCurrentUser(context.businessId, context.user.id); if (!ownStaffId || appointment.staffId !== ownStaffId) throw new Error("Puoi gestire solo i tuoi appuntamenti."); }
   await db.transaction(async tx=>{await tx.insert(appointmentProducts).values({businessId:context.businessId,appointmentId:appointment.id,productId:null,description:input.description,quantity:input.quantity,unitPrice:input.unitPrice.toFixed(2)});await tx.insert(appointmentEvents).values({appointmentId:appointment.id,businessId:context.businessId,type:"CUSTOM_PRODUCT_ADDED",actorId:context.user.id,note:`${input.description} × ${input.quantity} · € ${input.unitPrice.toFixed(2)}`});});
   revalidatePath("/app/agenda");
+}
+
+export async function addServiceToAppointment(formData:FormData){
+  const context=await requireBusinessContext();await ensureAdditionalServicesSchema();
+  const input=z.object({appointmentId:z.string().uuid(),serviceId:z.string().uuid(),durationMinutes:z.coerce.number().int().min(5).max(480),price:z.coerce.number().min(0).max(100000)}).parse(Object.fromEntries(formData));
+  await db.transaction(async tx=>{const[current]=await tx.select({id:appointments.id,staffId:appointments.staffId,endsAt:appointments.endsAt,status:appointments.status}).from(appointments).where(and(eq(appointments.id,input.appointmentId),eq(appointments.businessId,context.businessId))).limit(1);if(!current||!["BOOKED","CONFIRMED","ARRIVED"].includes(current.status))throw Error("La prenotazione non può essere estesa.");if(context.role==="STAFF"){const ownStaffId=await staffIdForCurrentUser(context.businessId,context.user.id);if(!ownStaffId||ownStaffId!==current.staffId)throw Error("Puoi modificare solo i tuoi appuntamenti.");}const[service]=await tx.select({id:services.id,name:services.name}).from(services).where(and(eq(services.id,input.serviceId),eq(services.businessId,context.businessId),eq(services.active,true))).limit(1);if(!service)throw Error("Servizio non disponibile.");const newEnd=new Date(current.endsAt.getTime()+input.durationMinutes*60_000);const[conflict]=await tx.select({id:appointments.id}).from(appointments).where(and(eq(appointments.businessId,context.businessId),eq(appointments.staffId,current.staffId),ne(appointments.id,current.id),lt(appointments.startsAt,newEnd),gt(appointments.endsAt,current.endsAt),sql`not ${appointments.status} in ('COMPLETED','CANCELLED','NO_SHOW')`)).limit(1);if(conflict)throw Error("Il tempo aggiunto si sovrappone all’appuntamento successivo.");await tx.insert(appointmentAdditionalServices).values({businessId:context.businessId,appointmentId:current.id,serviceId:service.id,serviceName:service.name,durationMinutes:input.durationMinutes,price:input.price.toFixed(2)});await tx.update(appointments).set({endsAt:newEnd,version:sql`${appointments.version} + 1`,updatedAt:new Date()}).where(eq(appointments.id,current.id));await tx.insert(appointmentEvents).values({appointmentId:current.id,businessId:context.businessId,type:"ADDITIONAL_SERVICE_ADDED",actorId:context.user.id,note:`${service.name} · ${input.durationMinutes} min · € ${input.price.toFixed(2)}`});});revalidatePath("/app/agenda");
 }
 
 

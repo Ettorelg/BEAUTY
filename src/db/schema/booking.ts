@@ -72,3 +72,5 @@ export const appointmentEvents = pgTable(
   (table) => [index("appointment_events_appointment_idx").on(table.appointmentId)],
 );
 
+export const appointmentAdditionalServices=pgTable("appointment_additional_services",{id:uuid("id").primaryKey().defaultRandom(),businessId:uuid("business_id").notNull().references(()=>businesses.id,{onDelete:"cascade"}),appointmentId:uuid("appointment_id").notNull().references(()=>appointments.id,{onDelete:"cascade"}),serviceId:uuid("service_id").references(()=>services.id,{onDelete:"set null"}),serviceName:text("service_name").notNull(),durationMinutes:integer("duration_minutes").notNull(),price:text("price").notNull(),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow()},t=>[index("appointment_additional_services_appointment_idx").on(t.appointmentId)]);
+

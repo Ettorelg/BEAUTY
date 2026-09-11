@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, monthGridDates, type AgendaView } from "@/modules/agenda/domain/calendar";
-import { addCustomProductToAppointment, addProductToAppointment, approveCustomerRescheduleRequestSafely, changeAppointmentService, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequestSafely, rescheduleAppointment } from "./actions";
+import { addCustomProductToAppointment, addProductToAppointment, addServiceToAppointment, approveCustomerRescheduleRequestSafely, changeAppointmentService, changeAppointmentStatus, createAppointment, rejectCustomerRescheduleRequestSafely, rescheduleAppointment } from "./actions";
 import { CustomerAutofill } from "./customer-autofill";
 import { AppointmentPriceEditor } from "./appointment-price-editor";
 
@@ -22,6 +22,8 @@ type Entry = {
   paymentStatus: string;
   previousOutstanding: number;
   productTotal: number;
+  additionalServiceTotal: number;
+  additionalServices: Array<{appointmentId:string;name:string;duration:number;price:string}>;
   recommendedProductIds: string[];
   rememberedNote?: string | null;
   absenceConflict?: boolean;
@@ -36,6 +38,7 @@ type Data = {
   catalog: Service[];
   inventoryEnabled: boolean;
   inventoryCatalog: Array<{id:string;name:string;stock:number;price:string;categoryId:string|null;categoryName:string|null}>;
+  additionalServiceCatalog: Array<{id:string;name:string;duration:number;price:string}>;
   usedProducts: Array<{appointmentId:string;name:string;quantity:number;unitPrice:string}>;
   entries: Entry[];
   rescheduleRequests: Array<{ id:string;appointmentId:string;customerName:string;serviceName:string;proposedStartsAt:string;proposedStaffName:string }>;
@@ -50,6 +53,12 @@ function ProductPanel({data,entry,close,load,setError}:{data:Data;entry:Entry;cl
   const results=available.filter(product=>!entry.recommendedProductIds.includes(product.id)&&(`${product.name} ${product.categoryName??""}`).toLowerCase().includes(query.toLowerCase()));
   const options=query.trim()?[...suggested,...results]:suggested;
   return <section className="agenda-action-panel agenda-products-panel"><div className="agenda-panel-heading"><div><span className="eyebrow">Magazzino</span><strong>Aggiungi prodotti</strong></div><button type="button" aria-label="Chiudi" onClick={close}>×</button></div>{data.usedProducts.filter(item=>item.appointmentId===entry.id).length?<div className="agenda-product-list">{data.usedProducts.filter(item=>item.appointmentId===entry.id).map((item,index)=><small key={index}><span>{item.name} × {item.quantity}</span><strong>{money(Number(item.unitPrice)*item.quantity)}</strong></small>)}</div>:<small className="muted">Nessun articolo ancora associato.</small>}{suggested.length?<><span className="eyebrow">Consigliati per questo servizio</span><div className="agenda-product-preview">{suggested.map(product=><button type="button" key={product.id} onClick={async()=>{const f=new FormData();f.set("appointmentId",entry.id);f.set("productId",product.id);f.set("quantity","1");try{await addProductToAppointment(f);await load();}catch{setError("Impossibile aggiungere il prodotto: controlla la giacenza.");}}}><strong>{product.name}</strong><small>{product.categoryName??"Articolo"} · {money(Number(product.price))}</small></button>)}</div></>:null}<label>Cerca in tutto il magazzino<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Nome o categoria del prodotto"/></label>{options.length?<form action={async formData=>{try{await addProductToAppointment(formData);await load();}catch{setError("Impossibile aggiungere il prodotto: controlla la giacenza.");}}} className="compact-form stacked"><label>Articolo<select name="productId">{options.map(product=><option key={product.id} value={product.id}>{product.name} · {product.categoryName??"Senza categoria"} · disponibili {product.stock}</option>)}</select></label><label>Quantità<input name="quantity" type="number" min="1" defaultValue="1"/></label><input type="hidden" name="appointmentId" value={entry.id}/><button className="primary-button">Aggiungi alla prenotazione</button></form>:query.trim()?<small className="muted">Nessun articolo trovato.</small>:null}<button type="button" className="ghost-button" onClick={()=>setCustom(!custom)}>＋ Articolo vario</button>{custom?<form action={async formData=>{try{await addCustomProductToAppointment(formData);await load();setCustom(false);}catch{setError("Controlla descrizione e importo dell’articolo vario.");}}} className="compact-form stacked"><input type="hidden" name="appointmentId" value={entry.id}/><label>Descrizione<input name="description" placeholder="Es. Accessorio o prodotto non catalogato" required/></label><div className="form-row"><label>Quantità<input name="quantity" type="number" min="1" defaultValue="1" required/></label><label>Importo unitario (€)<input name="unitPrice" type="number" min="0" step=".01" required/></label></div><button className="primary-button">Aggiungi articolo vario</button></form>:null}{!available.length?<div className="agenda-stock-empty"><strong>Articoli di magazzino non disponibili</strong><p>{data.inventoryCatalog.length?"Gli articoli presenti hanno giacenza zero.":"Non hai ancora creato articoli."}</p><a className="ghost-button link-button" href="/app/inventory">Vai al Magazzino e registra un carico</a></div>:null}</section>;
+}
+
+function AdditionalServiceForm({data,entry,load,setError}:{data:Data;entry:Entry;load:()=>Promise<void>;setError:(value:string)=>void}){
+  const first=data.additionalServiceCatalog[0];const[serviceId,setServiceId]=useState(first?.id??"");const[duration,setDuration]=useState(first?.duration??30);const[price,setPrice]=useState(first?.price??"0");
+  if(!first)return <p className="muted">Nessun altro servizio disponibile.</p>;
+  return <div className="agenda-extra-service"><h4>Aggiungi un servizio</h4>{entry.additionalServices.length?<div className="agenda-product-list">{entry.additionalServices.map((service,index)=><small key={index}><span>{service.name} · +{service.duration} min</span><strong>{money(Number(service.price))}</strong></small>)}</div>:null}<form action={async formData=>{try{await addServiceToAppointment(formData);await load();}catch(error){setError(error instanceof Error?error.message:"Impossibile aggiungere il servizio.");}}} className="compact-form stacked"><input type="hidden" name="appointmentId" value={entry.id}/><label>Servizio<select name="serviceId" value={serviceId} onChange={event=>{const selected=data.additionalServiceCatalog.find(service=>service.id===event.target.value);setServiceId(event.target.value);if(selected){setDuration(selected.duration);setPrice(selected.price);}}}>{data.additionalServiceCatalog.map(service=><option key={service.id} value={service.id}>{service.name}</option>)}</select></label><div className="form-row"><label>Tempo aggiuntivo (minuti)<input name="durationMinutes" type="number" min="5" max="480" step="5" value={duration} onChange={event=>setDuration(Number(event.target.value))}/></label><label>Costo aggiuntivo (€)<input name="price" type="number" min="0" step=".01" value={price} onChange={event=>setPrice(event.target.value)}/></label></div><p className="muted">Puoi modificare subito durata e prezzo rispetto ai valori del listino.</p><button className="primary-button">Aggiungi servizio e prolunga l’appuntamento</button></form></div>;
 }
 
 const statusLabels: Record<string, string> = {
@@ -158,7 +167,6 @@ export function AgendaCalendar({ today }: { today: string }) {
   const [failureFor, setFailureFor] = useState("");
   const [completionFor, setCompletionFor] = useState("");
   const [editFor, setEditFor] = useState("");
-  const [productsFor, setProductsFor] = useState("");
   const [completionNote, setCompletionNote] = useState("");
   const [completionPayment, setCompletionPayment] = useState<"PAID" | "UNPAID">("PAID");
   const [error, setError] = useState("");
@@ -338,22 +346,20 @@ export function AgendaCalendar({ today }: { today: string }) {
           return <div className="calendar-row" key={slotTime} style={{ gridColumn: "1 / -1", gridTemplateColumns: `76px repeat(${Math.max(data.staff.length, 1)}, minmax(190px,1fr))` }}>
             <time>{slotTime}</time>
             {data.staff.map((member) => <div className="calendar-cell" key={member.id}>
-              {data.entries.filter((entry) => entry.staffId === member.id && time(entry.startsAt) === slotTime).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id}>
+              {data.entries.filter((entry) => entry.staffId === member.id && time(entry.startsAt) === slotTime).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id} role="button" tabIndex={0} onClick={()=>setEditFor(entry.id)} onKeyDown={event=>{if(event.key==="Enter"||event.key===" ")setEditFor(entry.id)}}>
                 <span>{slotTime}</span>
                 <strong>{entry.customerName}</strong>
                 <small>{entry.serviceName} · {entry.staffName}</small>
-                <div className="agenda-total"><span>Totale</span><strong>{money(Number(entry.price)+entry.productTotal)}</strong>{entry.productTotal>0?<small>Servizio {money(Number(entry.price))} + prodotti {money(entry.productTotal)}</small>:null}</div>
+                <div className="agenda-total"><span>Totale</span><strong>{money(Number(entry.price)+entry.productTotal+entry.additionalServiceTotal)}</strong>{entry.productTotal+entry.additionalServiceTotal>0?<small>Base {money(Number(entry.price))}{entry.additionalServiceTotal>0?` + servizi ${money(entry.additionalServiceTotal)}`:""}{entry.productTotal>0?` + prodotti ${money(entry.productTotal)}`:""}</small>:null}</div>
                 {entry.previousOutstanding > 0 ? <small className="agenda-outstanding-badge">Sospeso {money(entry.previousOutstanding)} · Totale {money(entry.previousOutstanding + Number(entry.price))}</small> : null}
                 <em>{statusLabels[entry.status]}</em>
                 {entry.absenceConflict ? <strong className="agenda-absence-warning">⚠ Conflitto con assenza</strong> : null}
                 {entry.rememberedNote ? <p className="agenda-remembered-note"><strong>Nota precedente:</strong> {entry.rememberedNote}</p> : null}
                 <div className="agenda-action-buttons">
-                  {data.canManage || !["COMPLETED", "CANCELLED", "NO_SHOW"].includes(entry.status) ? <button type="button" className="ghost-button" aria-label="Modifica prenotazione" title="Modifica prenotazione" onClick={()=>{setEditFor(editFor===entry.id?"":entry.id);setProductsFor("");}}>✎</button>:null}
-                  {data.inventoryEnabled && !["CANCELLED","NO_SHOW"].includes(entry.status)?<button type="button" className="ghost-button" aria-label="Aggiungi prodotti" title="Aggiungi prodotti" onClick={()=>{setProductsFor(productsFor===entry.id?"":entry.id);setEditFor("");}}>▤</button>:null}
-                  {editableStatuses.includes(entry.status)?<button type="button" className="agenda-complete-action" aria-label="Completa prenotazione" title="Completa prenotazione" onClick={() => { setCompletionFor(completionFor === entry.id ? "" : entry.id); setCompletionNote(entry.rememberedNote ?? ""); setCompletionPayment("PAID"); setFailureFor(""); }}>✓</button>:null}
-                  {editableStatuses.includes(entry.status)?<button type="button" className="agenda-failure-action" aria-label="Segna come non concluso" title="Segna come non concluso" onClick={() => {setFailureFor(failureFor === entry.id ? "" : entry.id);setCompletionFor("");}}>×</button>:null}
+                  <button type="button" className="ghost-button" aria-label="Apri prenotazione" title="Apri prenotazione" onClick={event=>{event.stopPropagation();setEditFor(entry.id);}}>✎</button>
+                  {editableStatuses.includes(entry.status)?<button type="button" className="agenda-complete-action" aria-label="Chiudi prenotazione" title="Chiudi prenotazione" onClick={event => {event.stopPropagation();setCompletionFor(entry.id);setCompletionNote(entry.rememberedNote ?? "");setCompletionPayment("PAID");setFailureFor("");}}>✓</button>:null}
                 </div>
-                {editFor===entry.id ? <section className="agenda-action-panel">
+                {editFor===entry.id ? <section className="agenda-action-panel agenda-booking-modal" onClick={event=>event.stopPropagation()}><div className="agenda-panel-heading"><div><span className="eyebrow">Prenotazione</span><strong>{entry.customerName} · {entry.serviceName}</strong></div><button type="button" aria-label="Chiudi" onClick={()=>setEditFor("")}>×</button></div>
                   {data.canManage && editableStatuses.includes(entry.status) ? <form action={changeAppointmentService} className="compact-form stacked"><input type="hidden" name="id" value={entry.id}/><label>Servizio<select name="serviceId" defaultValue={entry.serviceId}>{data.catalog.filter((option, index, all) => all.findIndex((item) => item.id === option.id) === index).map((option) => <option value={option.id} key={option.id}>{option.name} · {option.duration} min</option>)}</select></label><button className="ghost-button">Cambia servizio senza controllo orario</button></form> : null}
                   <form action={rescheduleAppointment}>
                     <input type="hidden" name="id" value={entry.id} />
@@ -364,18 +370,17 @@ export function AgendaCalendar({ today }: { today: string }) {
                     <button className="ghost-button">Invia proposta al cliente</button>
                   </form>
                   {data.canManage ? <AppointmentPriceEditor appointmentId={entry.id} price={entry.price} onSaved={load} /> : null}
+                  {editableStatuses.includes(entry.status)?<AdditionalServiceForm data={data} entry={entry} load={load} setError={setError}/>:null}
+                  {data.inventoryEnabled&&! ["CANCELLED","NO_SHOW"].includes(entry.status)?<details className="agenda-modal-section"><summary>Prodotti e articoli</summary><ProductPanel data={data} entry={entry} close={()=>setEditFor("")} load={load} setError={setError}/></details>:null}
+                  {editableStatuses.includes(entry.status)?<div className="agenda-modal-status"><button type="button" className="agenda-complete-action" onClick={()=>{setEditFor("");setCompletionFor(entry.id);setCompletionNote(entry.rememberedNote??"");}}>✓ Completa</button><button type="button" className="agenda-failure-action" onClick={()=>setFailureFor(failureFor===entry.id?"":entry.id)}>× Non concluso</button></div>:null}
+                  {failureFor===entry.id?<div className="agenda-failure-reasons agenda-inline-panel"><button type="button" onClick={()=>void updateStatus(entry.id,"CANCELLED")}>Cancellato</button><button type="button" onClick={()=>void updateStatus(entry.id,"NO_SHOW")}>Non presentato</button></div>:null}
                 </section> : null}
-                {productsFor===entry.id ? <ProductPanel data={data} entry={entry} close={()=>setProductsFor("")} load={load} setError={setError}/>:null}
                 {completionFor === entry.id ? <div className="agenda-completion-note agenda-inline-panel">
                     <label>Note del trattamento<textarea value={completionNote} maxLength={500} placeholder="Prodotti usati, preferenze, risultato…" onChange={(event) => setCompletionNote(event.target.value)} /></label>
                     {entry.rememberedNote ? <small>È stata precaricata la nota precedente di questo cliente per {entry.serviceName}.</small> : null}
                     {entry.previousOutstanding > 0 ? <div className="agenda-payment-summary"><span>Sospeso precedente</span><strong>{money(entry.previousOutstanding)}</strong><span>Servizio corrente</span><strong>{money(Number(entry.price))}</strong><span>Totale cliente</span><strong>{money(entry.previousOutstanding + Number(entry.price))}</strong></div> : null}
                     {data.canManage ? <label>Pagamento<select value={completionPayment} onChange={(event) => setCompletionPayment(event.target.value as "PAID" | "UNPAID")}><option value="PAID">Pagato</option><option value="UNPAID">In sospeso</option></select></label> : <small>Il pagamento sarà registrato come in sospeso e potrà essere verificato dal titolare.</small>}
                     <div><button type="button" className="agenda-note-confirm" onClick={() => void updateStatus(entry.id, "COMPLETED", completionNote, data.canManage ? completionPayment : "UNPAID")}>Conferma eseguito</button><button type="button" onClick={() => { setCompletionFor(""); setCompletionNote(""); setCompletionPayment("PAID"); }}>Annulla</button></div>
-                  </div> : null}
-                  {failureFor === entry.id ? <div className="agenda-failure-reasons agenda-inline-panel">
-                    <button type="button" onClick={() => void updateStatus(entry.id, "CANCELLED")}>Cancellato</button>
-                    <button type="button" onClick={() => void updateStatus(entry.id, "NO_SHOW")}>Non presentato</button>
                   </div> : null}
               </article>)}
             </div>)}
