@@ -195,6 +195,7 @@ button { cursor: pointer; }
 .app-side-menu-footer { display: grid; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid #ece3de; }
 .app-side-menu-footer a { min-height: 44px; display: flex; align-items: center; gap: 12px; border-radius: 10px; padding: 9px 12px; color: #44352e; font-weight: 750; text-decoration: none; }
 .app-side-menu-footer button { width: 100%; min-height: 44px; }
+.site-install-button { border:0; background:transparent; color:inherit; text-decoration:underline; cursor:pointer; }
 .data-row h3, .data-row p { margin: 0 0 6px; }
 .data-row .eyebrow { font-size: .7rem; }
 .empty-state { padding: 32px; border: 1px dashed #cdbfb7; border-radius: 16px; color: #756a65; text-align: center; }
