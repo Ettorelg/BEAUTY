@@ -343,7 +343,7 @@ export function AgendaCalendar({ today }: { today: string }) {
         {data.staff.map((member) => <div className="staff-heading" key={member.id}>{member.name}</div>)}
         {dayTimes.length === 0 ? <div className="empty-state" style={{ gridColumn: "1 / -1" }}>Nessun appuntamento per questa giornata.</div> : null}
         {dayTimes.map((slotTime) => {
-          return <div className="calendar-row" key={slotTime} style={{ gridColumn: "1 / -1", gridTemplateColumns: `76px repeat(${Math.max(data.staff.length, 1)}, minmax(190px,1fr))` }}>
+          return <div className="calendar-row" key={slotTime} style={{ gridColumn: "1 / -1", gridTemplateColumns: `76px repeat(${Math.max(data.staff.length, 1)}, minmax(0,1fr))` }}>
             <time>{slotTime}</time>
             {data.staff.map((member) => <div className="calendar-cell" key={member.id}>
               {data.entries.filter((entry) => entry.staffId === member.id && time(entry.startsAt) === slotTime).map((entry) => <article className={`agenda-appointment status-${entry.status.toLowerCase()}`} key={entry.id} role="button" tabIndex={0} onClick={()=>setEditFor(entry.id)} onKeyDown={event=>{if(event.key==="Enter"||event.key===" ")setEditFor(entry.id)}}>

@@ -253,6 +253,12 @@ button { cursor: pointer; }
   .compact-form:not(.stacked) { display: grid; }
   .delete-form { width: 100%; }
   .delete-form .danger-button { width: 100%; }
+  .staff-row { display:grid; gap:12px; padding:14px; }
+  .staff-row .button-row, .staff-card-main .button-row { width:100%; display:grid; grid-template-columns:1fr; }
+  .staff-row button, .staff-row .ghost-button, .staff-row .primary-button { width:100%; min-height:44px; }
+  .staff-compact-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .staff-compact-stats span { display:grid; align-content:center; min-height:36px; text-align:center; }
+  .staff-services .checkbox-row { min-height:44px; }
   .public-header, .customer-account-header { align-items: flex-start; display: grid; gap: 18px; }
   .public-account-actions { align-items: flex-start; flex-direction: column; }
   .public-hero { min-height: 320px; padding: 28px; }
