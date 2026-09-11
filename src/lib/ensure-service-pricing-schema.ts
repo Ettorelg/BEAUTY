@@ -39,6 +39,8 @@ export function ensureServicePricingSchema() {
     await db.execute(sql.raw("ALTER TABLE services ADD COLUMN IF NOT EXISTS additional_service_mode text NOT NULL DEFAULT 'ALL'"));
     await db.execute(sql.raw("CREATE TABLE IF NOT EXISTS service_additional_compatibilities (business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE, primary_service_id uuid NOT NULL REFERENCES services(id) ON DELETE CASCADE, additional_service_id uuid NOT NULL REFERENCES services(id) ON DELETE CASCADE)"));
     await db.execute(sql.raw("CREATE UNIQUE INDEX IF NOT EXISTS service_additional_compatibility_unique ON service_additional_compatibilities(primary_service_id, additional_service_id)"));
+    await db.execute(sql.raw("CREATE TABLE IF NOT EXISTS service_occurrences (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE, service_id uuid NOT NULL REFERENCES services(id) ON DELETE CASCADE, staff_id uuid NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE, starts_at timestamptz NOT NULL, ends_at timestamptz NOT NULL, capacity integer NOT NULL, active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now())"));
+    await db.execute(sql.raw("CREATE UNIQUE INDEX IF NOT EXISTS service_occurrence_unique ON service_occurrences(business_id, service_id, staff_id, starts_at)"));
     await db.execute(
       sql.raw(`CREATE TABLE IF NOT EXISTS service_waitlist (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,

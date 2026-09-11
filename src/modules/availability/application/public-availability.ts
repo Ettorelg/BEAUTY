@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, gt } from "drizzle-orm";
+import { and, eq, inArray, lt, gt, gte } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   appointmentRescheduleRequests,
@@ -6,6 +6,7 @@ import {
   staffAbsences,
   staffMembers,
   staffServices,
+  serviceOccurrences,
   workingHours,
 } from "@/db/schema";
 import {
@@ -57,7 +58,7 @@ export async function getPublicAvailability(input: {
     );
   if (!eligible.length) return [];
   const staffIds = eligible.map((item) => item.id);
-  const [hours, absences, bookings, holds] = await Promise.all([
+  const [hours, absences, bookings, holds, occurrences] = await Promise.all([
     db
       .select()
       .from(workingHours)
@@ -82,6 +83,7 @@ export async function getPublicAvailability(input: {
     db
       .select({
         staffId: appointments.staffId,
+        serviceId: appointments.serviceId,
         startsAt: appointments.startsAt,
         endsAt: appointments.endsAt,
       })
@@ -112,6 +114,7 @@ export async function getPublicAvailability(input: {
           gt(appointmentRescheduleRequests.proposedEndsAt, dayStart),
         ),
       ),
+    db.select({ id: serviceOccurrences.id, staffId: serviceOccurrences.staffId, startsAt: serviceOccurrences.startsAt, endsAt: serviceOccurrences.endsAt, capacity: serviceOccurrences.capacity }).from(serviceOccurrences).where(and(eq(serviceOccurrences.businessId, input.businessId), eq(serviceOccurrences.serviceId, input.serviceId), eq(serviceOccurrences.active, true), gte(serviceOccurrences.startsAt, dayStart), lt(serviceOccurrences.startsAt, dayEnd))),
   ]);
   const formatter = new Intl.DateTimeFormat("en-GB", {
     timeZone: input.timezone,
@@ -124,6 +127,16 @@ export async function getPublicAvailability(input: {
     return h * 60 + m;
   };
   const now = new Date();
+  // I servizi a capienza (corsi/eventi) sono prenotabili soltanto nelle
+  // sessioni pubblicate dal titolare o dallo staff, non a ogni ora libera.
+  if (occurrences.length || (input.capacity ?? 1) > 1) {
+    return occurrences.filter(occurrence => occurrence.startsAt > now && !absences.some(item => item.staffId === occurrence.staffId && item.startsAt < occurrence.endsAt && item.endsAt > occurrence.startsAt) && !holds.some(item => item.staffId === occurrence.staffId && item.startsAt < occurrence.endsAt && item.endsAt > occurrence.startsAt)).map(occurrence => {
+      const groupBookings = bookings.filter(item => item.staffId === occurrence.staffId && item.serviceId === input.serviceId && item.startsAt.getTime() === occurrence.startsAt.getTime());
+      const conflicting = bookings.some(item => item.staffId === occurrence.staffId && !(item.serviceId === input.serviceId && item.startsAt.getTime() === occurrence.startsAt.getTime()) && item.startsAt < occurrence.endsAt && item.endsAt > occurrence.startsAt);
+      const localStart = `${input.date}T${formatter.format(occurrence.startsAt)}`;
+      return { staffId: occurrence.staffId, staffName: eligible.find(item => item.id === occurrence.staffId)?.name ?? "Operatore", localStart, label: formatter.format(occurrence.startsAt), availableSeats: conflicting ? 0 : Math.max(0, occurrence.capacity - groupBookings.length) };
+    }).filter(slot => slot.availableSeats > 0).sort((a,b) => a.localStart.localeCompare(b.localStart) || a.staffName.localeCompare(b.staffName));
+  }
 
   return eligible
     .flatMap((person) => {

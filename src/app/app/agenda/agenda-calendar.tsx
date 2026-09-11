@@ -17,8 +17,11 @@ import {
   changeAppointmentService,
   changeAppointmentStatus,
   createAppointment,
+  createServiceOccurrences,
+  cancelServiceOccurrence,
   rejectCustomerRescheduleRequestSafely,
   removeProductFromAppointment,
+  removeServiceFromAppointment,
   rescheduleAppointment,
 } from "./actions";
 import { CustomerAutofill } from "./customer-autofill";
@@ -30,6 +33,7 @@ type Service = {
   id: string;
   name: string;
   duration: number;
+  capacity: number;
   categoryId: string;
   categoryName: string;
 };
@@ -48,6 +52,7 @@ type Entry = {
   productTotal: number;
   additionalServiceTotal: number;
   additionalServices: Array<{
+    id: string;
     appointmentId: string;
     name: string;
     duration: number;
@@ -95,6 +100,7 @@ type Data = {
     unitPrice: string;
   }>;
   entries: Entry[];
+  occurrences: Array<{ id: string; serviceName: string; staffName: string; startsAt: string; capacity: number; occupied: number }>;
   rescheduleRequests: Array<{
     id: string;
     appointmentId: string;
@@ -341,12 +347,13 @@ function AdditionalServiceForm({
       <h4>Aggiungi un servizio</h4>
       {entry.additionalServices.length ? (
         <div className="agenda-product-list">
-          {entry.additionalServices.map((service, index) => (
-            <small key={index}>
+          {entry.additionalServices.map((service) => (
+            <small key={service.id}>
               <span>
-                {service.name} · +{service.duration} min
+                {service.name} · {service.duration ? `+${service.duration} min` : "in parallelo"}
               </span>
               <strong>{money(Number(service.price))}</strong>
+              <form action={async formData => { try { await removeServiceFromAppointment(formData); await load(); } catch (error) { setError(error instanceof Error ? error.message : "Impossibile rimuovere il servizio."); } }}><input type="hidden" name="id" value={service.id}/><button type="submit" className="icon-button" title="Rimuovi servizio" aria-label={`Rimuovi ${service.name}`}>×</button></form>
             </small>
           ))}
         </div>
@@ -396,7 +403,7 @@ function AdditionalServiceForm({
             <input
               name="durationMinutes"
               type="number"
-              min="5"
+              min="0"
               max="480"
               step="5"
               value={duration}
@@ -416,10 +423,10 @@ function AdditionalServiceForm({
           </label>
         </div>
         <p className="muted">
-          Puoi modificare subito durata e prezzo rispetto ai valori del listino.
+          Imposta 0 minuti se il servizio viene svolto in parallelo; il prezzo viene comunque aggiunto.
         </p>
         <button className="primary-button">
-          Aggiungi servizio e prolunga l’appuntamento
+          Aggiungi servizio
         </button>
       </form>
     </div>
@@ -725,6 +732,24 @@ function Booking({
   );
 }
 
+function CourseSession({ data, date, close, done }: { data: Data; date: string; close: () => void; done: () => void }) {
+  const catalog = Array.from(new Map(data.catalog.map(item => [item.id, item])).values());
+  const [serviceId, setServiceId] = useState(catalog[0]?.id ?? "");
+  const selected = catalog.find(item => item.id === serviceId);
+  const eligible = data.staff.filter(member => data.catalog.some(item => item.id === serviceId && item.staffId === member.id));
+  const [staffId, setStaffId] = useState(eligible[0]?.id ?? "");
+  const [frequency, setFrequency] = useState("ONCE");
+  return <div className="booking-modal-backdrop" onMouseDown={close}><section className="booking-modal" onMouseDown={event => event.stopPropagation()}><button className="modal-close" type="button" onClick={close}>×</button><p className="eyebrow">Sessione a posti limitati</p><h2>Rendi disponibile un corso o servizio</h2><form className="compact-form stacked" action={async formData => { try { await createServiceOccurrences(formData); done(); close(); } catch (error) { alert(error instanceof Error ? error.message : "Creazione non riuscita."); } }}>
+    <label>Servizio<select name="serviceId" value={serviceId} onChange={event => { const id = event.target.value; setServiceId(id); const firstStaff = data.catalog.find(item => item.id === id)?.staffId ?? ""; setStaffId(firstStaff); }}>{catalog.map(item => <option key={item.id} value={item.id}>{item.name} · {item.duration} min</option>)}</select></label>
+    <label>Operatore<select name="staffId" value={staffId} onChange={event => setStaffId(event.target.value)}>{eligible.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
+    <label>Data e ora<input type="datetime-local" name="startsAt" defaultValue={`${date}T09:00`} required/></label>
+    <label>Posti disponibili<input type="number" name="capacity" min="1" max="500" defaultValue={selected?.capacity ?? 10} required/></label>
+    <label>Ripetizione<select name="frequency" value={frequency} onChange={event => setFrequency(event.target.value)}><option value="ONCE">Solo questa volta</option><option value="DAILY">Ogni tot giorni</option><option value="WEEKLY">Ogni tot settimane</option></select></label>
+    {frequency !== "ONCE" ? <div className="form-row"><label>Ogni<input type="number" name="interval" min="1" max="12" defaultValue="1"/></label><label>Numero sessioni<input type="number" name="occurrences" min="1" max="104" defaultValue="8"/></label></div> : <><input type="hidden" name="interval" value="1"/><input type="hidden" name="occurrences" value="1"/></>}
+    <button className="primary-button">Pubblica disponibilità</button>
+  </form></section></div>;
+}
+
 export function AgendaCalendar({ today }: { today: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -743,6 +768,7 @@ export function AgendaCalendar({ today }: { today: string }) {
   );
   const [data, setData] = useState<Data>();
   const [open, setOpen] = useState(searchParams.get("new") === "1");
+  const [openCourse, setOpenCourse] = useState(false);
   const [showRevenue, setShowRevenue] = useState(false);
   const [failureFor, setFailureFor] = useState("");
   const [completionFor, setCompletionFor] = useState("");
@@ -965,6 +991,7 @@ export function AgendaCalendar({ today }: { today: string }) {
           {error}
         </p>
       ) : null}
+      {data.occurrences?.length ? <details className="agenda-occurrences"><summary>Sessioni pubblicate <span>{data.occurrences.length}</span></summary><div>{data.occurrences.map(item => <p key={item.id}><strong>{item.serviceName}</strong> · {new Date(item.startsAt).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short", timeZone: data.timezone })} · {item.staffName} · <b>{item.occupied}/{item.capacity} posti</b>{data.canManage && !item.occupied ? <button className="icon-button" type="button" title="Rimuovi sessione" onClick={async () => { const form = new FormData(); form.set("id", item.id); try { await cancelServiceOccurrence(form); await load(); } catch (error) { setError(error instanceof Error ? error.message : "Rimozione non riuscita."); } }}>×</button> : null}</p>)}</div></details> : null}
       {data.rescheduleRequests?.length ? (
         <section className="panel">
           <h2>Richieste di modifica dei clienti</h2>
@@ -1569,15 +1596,7 @@ export function AgendaCalendar({ today }: { today: string }) {
         </div>
       )}
 
-      {data.canManage ? (
-        <button
-          className="new-booking-fab"
-          type="button"
-          onClick={() => setOpen(true)}
-        >
-          <span>＋</span> Nuova prenotazione
-        </button>
-      ) : null}
+      {data.canEditAppointments ? <div className="agenda-fab-stack"><button className="ghost-button" type="button" onClick={() => setOpenCourse(true)}>◷ Pubblica sessione</button><button className="new-booking-fab" type="button" onClick={() => setOpen(true)}><span>＋</span> Nuova prenotazione</button></div> : null}
       {open ? (
         <Booking
           data={data}
@@ -1586,6 +1605,7 @@ export function AgendaCalendar({ today }: { today: string }) {
           done={load}
         />
       ) : null}
+      {openCourse ? <CourseSession data={data} date={date} close={() => setOpenCourse(false)} done={load}/> : null}
     </>
   );
 }

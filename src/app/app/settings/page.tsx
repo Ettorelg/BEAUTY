@@ -1,2 +1,37 @@
-import { redirect } from "next/navigation"; import { eq } from "drizzle-orm"; import { AppNav } from "../app-nav"; import { requireBusinessContext } from "@/lib/business-context"; import { BUSINESS_TYPES,BUSINESS_TYPE_LABELS,MODULE_LABELS,OPTIONAL_MODULES } from "@/lib/business-settings"; import { saveBusinessSettings } from "./actions"; import { db } from "@/db/client"; import { businesses } from "@/db/schema";
-export default async function Page({searchParams}:{searchParams:Promise<{saved?:string}>}){const c=await requireBusinessContext();if(c.role!=="OWNER")redirect("/app/agenda");const q=await searchParams;const[b]=await db.select({whatsappRemindersEnabled:businesses.whatsappRemindersEnabled,phoneId:businesses.whatsappPhoneNumberId,hasToken:businesses.whatsappAccessTokenEncrypted,template:businesses.whatsappReminderTemplate,language:businesses.whatsappTemplateLanguage}).from(businesses).where(eq(businesses.id,c.businessId)).limit(1);const whatsappConfigured=Boolean(b?.phoneId&&b?.hasToken&&b?.template);return <main className="dashboard-shell"><AppNav businessName={c.businessName} role={c.role}/><section className="page-heading"><div><p className="eyebrow">Personalizzazione</p><h1>Tipo di attività e funzioni</h1></div><p className="muted">Mostra solo gli strumenti utili alla tua attività. Puoi cambiare queste scelte in qualsiasi momento.</p></section>{q.saved?<p className="success-message">Configurazione salvata.</p>:null}<section className="panel"><form action={saveBusinessSettings} className="compact-form stacked"><label>Tipo di attività<select name="businessType" defaultValue={c.businessType}>{BUSINESS_TYPES.map(type=><option key={type} value={type}>{BUSINESS_TYPE_LABELS[type]}</option>)}</select></label><fieldset className="compact-form stacked"><legend>Funzioni attive</legend>{OPTIONAL_MODULES.map(module=><label className="checkbox-row" key={module}><input type="checkbox" name={`module_${module}`} defaultChecked={c.modules.includes(module)}/>{MODULE_LABELS[module]}</label>)}</fieldset><details className="service-category"><summary>Collega WhatsApp Business<span>{whatsappConfigured?"Account collegato":"Da configurare"}</span></summary><div className="compact-form stacked"><label>ID numero di telefono Meta<input name="whatsappPhoneNumberId" defaultValue={b?.phoneId??""} placeholder="Phone Number ID"/></label><label>Token di accesso<input name="whatsappAccessToken" type="password" autoComplete="new-password" placeholder={b?.hasToken?"Token già salvato · lascia vuoto per mantenerlo":"Token permanente Meta"}/></label><label>Template promemoria<input name="whatsappReminderTemplate" defaultValue={b?.template??""} placeholder="promemoria_prenotazione"/></label><label>Lingua template<input name="whatsappTemplateLanguage" defaultValue={b?.language??"it"} placeholder="it"/></label><label className="checkbox-row"><input type="checkbox" name="whatsappRemindersEnabled" defaultChecked={b?.whatsappRemindersEnabled??false}/> Attiva i promemoria WhatsApp per questa attività</label><p className="muted">Il token viene cifrato prima di essere salvato e non sarà più mostrato. Se WhatsApp non è disponibile, il sistema utilizza l’email.</p>{!process.env.WHATSAPP_CREDENTIALS_KEY?<p className="empty-state">L’amministratore deve configurare una sola volta WHATSAPP_CREDENTIALS_KEY su Railway.</p>:null}</div></details><p className="muted">Agenda, servizi, clienti e profilo attività restano sempre disponibili. Il magazzino consente prodotti, giacenze e articoli abbinati ai servizi.</p><button className="primary-button">Salva configurazione</button></form></section></main>}
+import { eq } from "drizzle-orm";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { db } from "@/db/client";
+import { businesses } from "@/db/schema";
+import { BUSINESS_TYPES, BUSINESS_TYPE_LABELS, MODULE_LABELS, OPTIONAL_MODULES } from "@/lib/business-settings";
+import { requireBusinessContext } from "@/lib/business-context";
+import { AppNav } from "../app-nav";
+import { LogoutButton } from "../logout-button";
+import { saveBusinessSettings } from "./actions";
+
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+  const context = await requireBusinessContext();
+  if (context.role !== "OWNER") redirect("/app/agenda");
+  const query = await searchParams;
+  const [business] = await db.select({ whatsappRemindersEnabled: businesses.whatsappRemindersEnabled, phoneId: businesses.whatsappPhoneNumberId, hasToken: businesses.whatsappAccessTokenEncrypted, template: businesses.whatsappReminderTemplate, language: businesses.whatsappTemplateLanguage }).from(businesses).where(eq(businesses.id, context.businessId)).limit(1);
+  const whatsappConfigured = Boolean(business?.phoneId && business?.hasToken && business?.template);
+  return <main className="dashboard-shell"><AppNav businessName={context.businessName} role={context.role}/>
+    <section className="page-heading"><div><p className="eyebrow">Personalizzazione</p><h1>Tipo di attività e funzioni</h1></div><p className="muted">Mostra solo gli strumenti utili alla tua attività.</p></section>
+    {query.saved ? <p className="success-message">Configurazione salvata.</p> : null}
+    <section className="panel"><form action={saveBusinessSettings} className="compact-form stacked">
+      <label>Tipo di attività<select name="businessType" defaultValue={context.businessType}>{BUSINESS_TYPES.map(type => <option key={type} value={type}>{BUSINESS_TYPE_LABELS[type]}</option>)}</select></label>
+      <fieldset className="compact-form stacked"><legend>Funzioni attive</legend>{OPTIONAL_MODULES.map(module => <label className="checkbox-row" key={module}><input type="checkbox" name={`module_${module}`} defaultChecked={context.modules.includes(module)}/>{MODULE_LABELS[module]}</label>)}</fieldset>
+      <details className="service-category"><summary>Collega WhatsApp Business<span>{whatsappConfigured ? "Account collegato" : "Da configurare"}</span></summary><div className="compact-form stacked">
+        <label>ID numero di telefono Meta<input name="whatsappPhoneNumberId" defaultValue={business?.phoneId ?? ""} placeholder="Phone Number ID"/></label>
+        <label>Token di accesso<input name="whatsappAccessToken" type="password" autoComplete="new-password" placeholder={business?.hasToken ? "Token già salvato · lascia vuoto per mantenerlo" : "Token permanente Meta"}/></label>
+        <label>Template promemoria<input name="whatsappReminderTemplate" defaultValue={business?.template ?? ""} placeholder="promemoria_prenotazione"/></label>
+        <label>Lingua template<input name="whatsappTemplateLanguage" defaultValue={business?.language ?? "it"}/></label>
+        <label className="checkbox-row"><input type="checkbox" name="whatsappRemindersEnabled" defaultChecked={business?.whatsappRemindersEnabled ?? false}/> Attiva i promemoria WhatsApp per questa attività</label>
+        <p className="muted">Il token viene cifrato e non sarà più mostrato. Se WhatsApp non è disponibile viene utilizzata l’email.</p>
+        {!process.env.WHATSAPP_CREDENTIALS_KEY ? <p className="empty-state">L’amministratore deve configurare WHATSAPP_CREDENTIALS_KEY su Railway.</p> : null}
+      </div></details>
+      <p className="muted">Agenda, servizi, clienti e profilo attività restano sempre disponibili.</p><button className="primary-button">Salva configurazione</button>
+    </form></section>
+    <section className="panel"><h2>Account e accesso</h2><div className="button-row"><Link className="ghost-button link-button" href="/account/connections?next=/app/settings">Account e Google</Link><LogoutButton/></div></section>
+  </main>;
+}

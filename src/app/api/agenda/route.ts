@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { appointmentAdditionalServices, appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryCategories, inventoryCategoryServiceCategories, inventoryCategoryServices, inventoryProducts, inventoryProductServices, serviceCategories, serviceWaitlist, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
+import { appointmentAdditionalServices, appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryCategories, inventoryCategoryServiceCategories, inventoryCategoryServices, inventoryProducts, inventoryProductServices, serviceCategories, serviceOccurrences, serviceWaitlist, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       .where(and(staffCondition, eq(staffMembers.active, true)))
       .orderBy(asc(staffMembers.name)),
     db
-          .select({ staffId: staffServices.staffId, id: services.id, name: services.name, duration: services.durationMinutes, categoryId: services.categoryId, categoryName: serviceCategories.name })
+          .select({ staffId: staffServices.staffId, id: services.id, name: services.name, duration: services.durationMinutes, capacity: services.capacity, categoryId: services.categoryId, categoryName: serviceCategories.name })
           .from(staffServices)
           .innerJoin(services, and(eq(staffServices.serviceId, services.id), eq(services.businessId, context.businessId), eq(services.active, true)))
           .innerJoin(serviceCategories, eq(serviceCategories.id, services.categoryId))
@@ -154,9 +154,11 @@ export async function GET(request: NextRequest) {
   }));
 
   const appointmentIds=rawEntries.map(entry=>entry.id);
+  const occurrenceRows = await db.select({ id: serviceOccurrences.id, serviceId: serviceOccurrences.serviceId, serviceName: services.name, staffId: serviceOccurrences.staffId, staffName: staffMembers.name, startsAt: serviceOccurrences.startsAt, endsAt: serviceOccurrences.endsAt, capacity: serviceOccurrences.capacity }).from(serviceOccurrences).innerJoin(services, eq(services.id, serviceOccurrences.serviceId)).innerJoin(staffMembers, eq(staffMembers.id, serviceOccurrences.staffId)).where(and(eq(serviceOccurrences.businessId, context.businessId), eq(serviceOccurrences.active, true), gte(serviceOccurrences.startsAt, start), lt(serviceOccurrences.startsAt, end), isOwner ? undefined : eq(serviceOccurrences.staffId, ownStaff!.id))).orderBy(asc(serviceOccurrences.startsAt));
+  const occurrences = occurrenceRows.map(item => ({ ...item, occupied: rawEntries.filter(entry => ["BOOKED","CONFIRMED","ARRIVED"].includes(entry.status) && entry.serviceId === item.serviceId && entry.staffId === item.staffId && entry.startsAt.getTime() === item.startsAt.getTime()).length }));
   const [additionalServiceCatalog,additionalServices]=await Promise.all([
     db.select({id:services.id,name:services.name,duration:services.durationMinutes,price:services.price}).from(services).where(and(eq(services.businessId,context.businessId),eq(services.active,true))).orderBy(asc(services.name)),
-    appointmentIds.length?db.select({appointmentId:appointmentAdditionalServices.appointmentId,name:appointmentAdditionalServices.serviceName,duration:appointmentAdditionalServices.durationMinutes,price:appointmentAdditionalServices.price}).from(appointmentAdditionalServices).where(and(eq(appointmentAdditionalServices.businessId,context.businessId),inArray(appointmentAdditionalServices.appointmentId,appointmentIds))):Promise.resolve([]),
+    appointmentIds.length?db.select({id:appointmentAdditionalServices.id,appointmentId:appointmentAdditionalServices.appointmentId,name:appointmentAdditionalServices.serviceName,duration:appointmentAdditionalServices.durationMinutes,price:appointmentAdditionalServices.price}).from(appointmentAdditionalServices).where(and(eq(appointmentAdditionalServices.businessId,context.businessId),inArray(appointmentAdditionalServices.appointmentId,appointmentIds))):Promise.resolve([]),
   ]);
   const [inventoryCatalog,usedProducts,directProductLinks,categoryServiceLinks,categoryGroupLinks]=context.modules.includes("INVENTORY")?await Promise.all([
     db.select({id:inventoryProducts.id,name:inventoryProducts.name,stock:inventoryProducts.stock,price:inventoryProducts.salePrice,categoryId:inventoryProducts.categoryId,categoryName:inventoryCategories.name}).from(inventoryProducts).leftJoin(inventoryCategories,eq(inventoryCategories.id,inventoryProducts.categoryId)).where(eq(inventoryProducts.businessId,context.businessId)).orderBy(asc(inventoryProducts.name)),
@@ -171,6 +173,6 @@ export async function GET(request: NextRequest) {
   const rescheduleRequests = await db.select({ id: appointmentRescheduleRequests.id, appointmentId: appointmentRescheduleRequests.appointmentId, proposedStartsAt: appointmentRescheduleRequests.proposedStartsAt, customerName: customerRelations.name, serviceName: appointments.serviceName, currentStaffId: appointments.staffId, proposedStaffId: appointmentRescheduleRequests.proposedStaffId })
     .from(appointmentRescheduleRequests).innerJoin(appointments, eq(appointments.id, appointmentRescheduleRequests.appointmentId)).leftJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId)).where(and(eq(appointmentRescheduleRequests.businessId, context.businessId), eq(appointmentRescheduleRequests.proposerType, "CUSTOMER"), eq(appointmentRescheduleRequests.status, "PENDING"), gt(appointmentRescheduleRequests.expiresAt, new Date()), isOwner ? undefined : eq(appointments.staffId, ownStaff!.id)));
   const staffNames = new Map(staff.map(member => [member.id, member.name]));
-  return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, canEditAppointments: true, inventoryEnabled: context.modules.includes("INVENTORY"), inventoryCatalog, usedProducts, additionalServiceCatalog, staff, catalog, entries:enrichedEntries, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
+  return NextResponse.json({ date, startDate, view, timezone: context.timezone, canManage: isOwner, canEditAppointments: true, inventoryEnabled: context.modules.includes("INVENTORY"), inventoryCatalog, usedProducts, additionalServiceCatalog, staff, catalog, entries:enrichedEntries, occurrences, rescheduleRequests: rescheduleRequests.map(request => ({ ...request, proposedStaffName: staffNames.get(request.proposedStaffId) ?? "Operatore", proposedStartsAt: request.proposedStartsAt.toISOString() })) });
 }
 

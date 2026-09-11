@@ -303,6 +303,13 @@ button { cursor: pointer; }
 .compact-service-row .delete-form summary { padding: 6px 9px; font-size: .72rem; }
 .slot-seats { color: #28724a !important; font-weight: 800; }
 .slot-seats.last-seat { color: #ad542e !important; }
+.agenda-fab-stack { position: fixed; right: 24px; bottom: 22px; z-index: 30; display: flex; align-items: center; gap: 8px; }
+.agenda-fab-stack .new-booking-fab { position: static; }
+.agenda-occurrences { margin: 6px 0; padding: 8px 12px; border: 1px solid #e4ddd8; border-radius: 12px; background: #fff; }
+.agenda-occurrences > summary { cursor: pointer; font-weight: 800; }
+.agenda-occurrences > summary span { margin-left: 6px; color: var(--muted); }
+.agenda-occurrences > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.agenda-occurrences p { margin: 0; padding: 6px 9px; border-radius: 8px; background: #f4efec; font-size: .76rem; }
 .auth-professional { background: radial-gradient(circle at 15% 10%, #6f5145 0, #2a211e 42%, #151313 100%); }
 .auth-professional .auth-card { background: #fffaf7; border-color: #9b7665; }
 .auth-customer { background: radial-gradient(circle at 85% 0%, #f4d9d0 0, #fff8f5 48%, #f8eee9 100%); }

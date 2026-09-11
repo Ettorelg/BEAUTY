@@ -89,6 +89,18 @@ export const serviceAdditionalCompatibilities = pgTable("service_additional_comp
   additionalServiceId: uuid("additional_service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
 }, table => [uniqueIndex("service_additional_compatibility_unique").on(table.primaryServiceId, table.additionalServiceId), index("service_additional_compatibility_business_idx").on(table.businessId)]);
 
+export const serviceOccurrences = pgTable("service_occurrences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  staffId: uuid("staff_id").notNull().references(() => staffMembers.id, { onDelete: "cascade" }),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  capacity: integer("capacity").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex("service_occurrence_unique").on(table.businessId, table.serviceId, table.staffId, table.startsAt), index("service_occurrence_period_idx").on(table.businessId, table.startsAt)]);
+
 export const staffMembers = pgTable(
   "staff_members",
   {

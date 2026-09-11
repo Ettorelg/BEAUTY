@@ -22,6 +22,7 @@ import {
   staffServices,
   serviceWaitlist,
   serviceAdditionalCompatibilities,
+  serviceOccurrences,
   users,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
@@ -137,6 +138,8 @@ export async function createPublicAppointment(formData: FormData) {
     throw Error("Lo slot non è più disponibile.");
 
   const startsAt = zonedLocalToUtc(localStart, selection.timezone);
+  const [occurrence] = await db.select({ capacity: serviceOccurrences.capacity }).from(serviceOccurrences).where(and(eq(serviceOccurrences.businessId, selection.businessId), eq(serviceOccurrences.serviceId, input.serviceId), eq(serviceOccurrences.staffId, staffId), eq(serviceOccurrences.startsAt, startsAt), eq(serviceOccurrences.active, true))).limit(1);
+  const bookingCapacity = occurrence?.capacity ?? selection.capacity;
   const signedIn =
     session?.user.email.toLowerCase() === input.email.toLowerCase()
       ? session.user
@@ -239,7 +242,7 @@ export async function createPublicAppointment(formData: FormData) {
       date,
       durationMinutes: effectiveDuration,
       timezone: selection.timezone,
-      capacity: selection.capacity,
+      capacity: bookingCapacity,
     });
     if (
       !effectiveSlots.some(
@@ -262,7 +265,7 @@ export async function createPublicAppointment(formData: FormData) {
           sql`"status" in ('BOOKED','CONFIRMED','ARRIVED')`,
         ),
       );
-    if (busy.length >= selection.capacity)
+    if (busy.length >= bookingCapacity)
       throw Error("Lo slot ha raggiunto il numero massimo di posti.");
     const basePrice =
       previousService &&

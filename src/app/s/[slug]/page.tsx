@@ -497,7 +497,7 @@ export default async function Page({
                   additionalServiceIds={selectedExtraIds}
                   additionalPrice={extraPrice}
                   additionalDuration={extraDuration}
-                  showAvailableSeats={service.capacity > 1}
+                  showAvailableSeats={service.capacity > 1 || compact.some(slot => slot.totalAvailableSeats > 1)}
                 />
               </>
             ) : (
