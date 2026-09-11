@@ -29,6 +29,7 @@ import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
 import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
 import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
 import { sendBookingConfirmation, sendRescheduleApprovalEmail } from "@/lib/staff-invitations";
+import { offerNextWaitlist } from "@/lib/waitlist";
 import { approveRescheduleRequest, createRescheduleRequest } from "@/lib/reschedule-requests";
 import { isAppointmentStatus } from "@/modules/appointments/domain/status";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
@@ -144,8 +145,9 @@ export async function changeAppointmentStatus(formData: FormData) {
   const ownStaffId = context.role === "STAFF" ? await staffIdForCurrentUser(context.businessId, context.user.id) : undefined;
   if (context.role === "STAFF" && !ownStaffId) throw new Error("Profilo operatore non collegato.");
   if (next === "COMPLETED") { await ensureFidelitySchema(); await ensurePaymentSchema(); }
+  let cancelledSlot: { serviceId: string; staffId: string; startsAt: Date } | undefined;
   await db.transaction(async (tx) => {
-    const [current] = await tx.select({ status: appointments.status, staffId: appointments.staffId, customerId: appointments.customerRelationId, price: appointments.price, paymentStatus: appointments.paymentStatus })
+    const [current] = await tx.select({ status: appointments.status, staffId: appointments.staffId, serviceId: appointments.serviceId, startsAt: appointments.startsAt, customerId: appointments.customerRelationId, price: appointments.price, paymentStatus: appointments.paymentStatus })
       .from(appointments).where(and(eq(appointments.id, id), eq(appointments.businessId, context.businessId))).limit(1);
     if (!current || (ownStaffId && current.staffId !== ownStaffId)) throw new Error("Appuntamento non disponibile.");
     const paymentStatus = next === "COMPLETED" ? (context.role === "OWNER" ? requestedPayment ?? "UNPAID" : "UNPAID") : "NOT_DUE";
@@ -153,6 +155,7 @@ export async function changeAppointmentStatus(formData: FormData) {
     await tx.update(appointments).set({ status: next, paymentStatus, paidAt, ...(next === "COMPLETED" && completionNote ? { notes: completionNote } : {}), version: sql`${appointments.version} + 1`, updatedAt: new Date() }).where(eq(appointments.id, id));
     await tx.insert(appointmentEvents).values({ appointmentId: id, businessId: context.businessId, type: "STATUS_CHANGED", fromStatus: current.status, toStatus: next, actorId: context.user.id, note: next === "COMPLETED" ? [completionNote, `Pagamento: ${paymentStatus === "PAID" ? "pagato" : "in sospeso"}`].filter(Boolean).join(" · ") : undefined });
     if (next === "CANCELLED" && current.status !== "CANCELLED") {
+      cancelledSlot = { serviceId: current.serviceId, staffId: current.staffId, startsAt: current.startsAt };
       const [redemption] = await tx.select().from(fidelityRedemptions).where(and(eq(fidelityRedemptions.appointmentId, id), isNull(fidelityRedemptions.reversedAt))).limit(1);
       if (redemption) {
         await tx.update(fidelityCards).set({ points: sql`${fidelityCards.points} + ${redemption.pointsSpent}`, updatedAt: new Date() }).where(and(eq(fidelityCards.businessId, context.businessId), eq(fidelityCards.customerRelationId, current.customerId)));
@@ -169,6 +172,9 @@ export async function changeAppointmentStatus(formData: FormData) {
       }
     }
   });
+  if (cancelledSlot) {
+    await offerNextWaitlist({ businessId: context.businessId, ...cancelledSlot });
+  }
   revalidatePath("/app/agenda"); revalidatePath("/app/customers"); revalidatePath("/app/fidelity");
 }
 

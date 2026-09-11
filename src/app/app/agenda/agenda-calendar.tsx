@@ -57,6 +57,10 @@ type Entry = {
   rememberedNote?: string | null;
   notes?: string | null;
   absenceConflict?: boolean;
+  capacity: number;
+  occupied: number;
+  available: number;
+  waiting: number;
 };
 type Data = {
   date: string;
@@ -1148,6 +1152,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                     <span>{time(entry.startsAt)}</span>
                     <strong>{entry.customerName}</strong>
                     <small>{entry.serviceName}</small>
+                    {entry.capacity > 1 ? <small>{entry.occupied}/{entry.capacity} posti · {entry.waiting} in attesa</small> : null}
                     <small className="agenda-price">
                       {money(
                         Number(entry.price) +
@@ -1223,6 +1228,7 @@ export function AgendaCalendar({ today }: { today: string }) {
                             <small>
                               {entry.serviceName} · {entry.staffName}
                             </small>
+                            {entry.capacity > 1 ? <small>{entry.occupied}/{entry.capacity} posti · {entry.available} disponibili · {entry.waiting} in attesa</small> : null}
                             {entry.notes ? (
                               <small className="agenda-card-note">
                                 {entry.notes}

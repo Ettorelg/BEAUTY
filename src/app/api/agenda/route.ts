@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { appointmentAdditionalServices, appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryCategories, inventoryCategoryServiceCategories, inventoryCategoryServices, inventoryProducts, inventoryProductServices, serviceCategories, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
+import { appointmentAdditionalServices, appointmentProducts, appointmentRescheduleRequests, appointments, customerRelations, inventoryCategories, inventoryCategoryServiceCategories, inventoryCategoryServices, inventoryProducts, inventoryProductServices, serviceCategories, serviceWaitlist, services, staffAbsences, staffInvitations, staffMembers, staffServices } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureFidelitySchema } from "@/lib/ensure-fidelity-schema";
 import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
         endsAt: appointments.endsAt,
         status: appointments.status,
         serviceId: appointments.serviceId,
+        capacity: services.capacity,
         serviceCategoryId: services.categoryId,
         serviceName: appointments.serviceName,
         customerName: customerRelations.name,
@@ -106,6 +107,18 @@ export async function GET(request: NextRequest) {
 
   const customerIds = [...new Set(rawEntries.map((entry) => entry.customerId))];
   const serviceIds = [...new Set(rawEntries.map((entry) => entry.serviceId))];
+  const waitingRows = await db.select({ serviceId: serviceWaitlist.serviceId, staffId: serviceWaitlist.staffId, startsAt: serviceWaitlist.startsAt }).from(serviceWaitlist).where(and(eq(serviceWaitlist.businessId, context.businessId), gte(serviceWaitlist.startsAt, start), lt(serviceWaitlist.startsAt, end), inArray(serviceWaitlist.status, ["WAITING", "OFFERED"])));
+  const slotKey = (serviceId: string, staffId: string, startsAt: Date) => `${serviceId}:${staffId}:${startsAt.toISOString()}`;
+  const occupiedBySlot = new Map<string, number>();
+  for (const item of rawEntries.filter((entry) => ["BOOKED", "CONFIRMED", "ARRIVED"].includes(entry.status))) {
+    const key = slotKey(item.serviceId, item.staffId, item.startsAt);
+    occupiedBySlot.set(key, (occupiedBySlot.get(key) ?? 0) + 1);
+  }
+  const waitingBySlot = new Map<string, number>();
+  for (const item of waitingRows) {
+    const key = slotKey(item.serviceId, item.staffId, item.startsAt);
+    waitingBySlot.set(key, (waitingBySlot.get(key) ?? 0) + 1);
+  }
   const unpaidRows = customerIds.length
     ? await db.select({ customerId: appointments.customerRelationId, price: appointments.price }).from(appointments).where(and(
         eq(appointments.businessId, context.businessId), eq(appointments.status, "COMPLETED"),
@@ -127,6 +140,9 @@ export async function GET(request: NextRequest) {
     : [];
   const entries = rawEntries.map((entry) => ({
     ...entry,
+    occupied: occupiedBySlot.get(slotKey(entry.serviceId, entry.staffId, entry.startsAt)) ?? 0,
+    available: Math.max(0, entry.capacity - (occupiedBySlot.get(slotKey(entry.serviceId, entry.staffId, entry.startsAt)) ?? 0)),
+    waiting: waitingBySlot.get(slotKey(entry.serviceId, entry.staffId, entry.startsAt)) ?? 0,
     previousOutstanding: outstandingByCustomer.get(entry.customerId) ?? 0,
     absenceConflict: ["BOOKED", "CONFIRMED", "ARRIVED"].includes(entry.status) && absences.some((absence) => absence.staffId === entry.staffId && absence.startsAt < entry.endsAt && absence.endsAt > entry.startsAt),
     rememberedNote: noteHistory.find((item) =>

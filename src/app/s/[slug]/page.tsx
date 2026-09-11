@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, gte, lt, inArray } from "drizzle-orm";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -23,9 +23,11 @@ import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema"
 import { LogoutButton } from "@/app/app/logout-button";
 import { getPublicAvailability } from "@/modules/availability/application/public-availability";
 import { createPublicAppointment } from "./actions";
+import { joinServiceWaitlist } from "./actions";
 import { BookingDetailsForm } from "./booking-details-form";
 import { BookingFilters } from "./booking-filters";
 import { describePointAward } from "@/modules/fidelity/domain/rewards";
+import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 const dateOk = (v?: string) => /^\d{4}-\d{2}-\d{2}$/.test(v ?? "");
 const after = (v: string, n: number) => {
   const d = new Date(`${v}T12:00:00Z`);
@@ -37,7 +39,7 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ service?: string; date?: string; staff?: string }>;
+  searchParams: Promise<{ service?: string; date?: string; staff?: string;waitlist?:string }>;
 }) {
   const [{ slug }, q] = await Promise.all([params, searchParams]);
   const [b] = await db
@@ -203,6 +205,9 @@ export default async function Page({
         .orderBy(asc(staffMembers.name))
     : [];
   const staffId = staff.some((x) => x.id === q.staff) ? q.staff : undefined;
+  const selectedDayStart=zonedLocalToUtc(`${date}T00:00`,b.timezone),selectedDayEnd=zonedLocalToUtc(`${after(date,1)}T00:00`,b.timezone);
+  const bookedForDay=service&&service.capacity>1?await db.select({staffId:appointments.staffId,startsAt:appointments.startsAt,staffName:staffMembers.name}).from(appointments).innerJoin(staffMembers,eq(staffMembers.id,appointments.staffId)).where(and(eq(appointments.businessId,b.id),eq(appointments.serviceId,service.id),inArray(appointments.status,["BOOKED","CONFIRMED","ARRIVED"]),gte(appointments.startsAt,selectedDayStart),lt(appointments.startsAt,selectedDayEnd),staffId?eq(appointments.staffId,staffId):undefined)):[];
+  const fullCourseSlots=service?Array.from(bookedForDay.reduce((map,item)=>{const key=`${item.staffId}|${item.startsAt.toISOString()}`,group=map.get(key)??{...item,count:0};group.count++;map.set(key,group);return map},new Map<string,{staffId:string;startsAt:Date;staffName:string;count:number}>()).values()).filter(item=>item.count>=service.capacity):[];
   let slots = service
     ? await getPublicAvailability({
         businessId: b.id,
@@ -218,7 +223,7 @@ export default async function Page({
       })
     : [];
   if (staffId) slots = slots.filter((x) => x.staffId === staffId);
-  if (service && !slots.length)
+  if (service && !slots.length && !(service.capacity>1&&service.waitlistEnabled))
     for (let i = 1; i <= 30 && !slots.length; i++) {
       const candidate = after(date, i);
       let found = await getPublicAvailability({
@@ -473,9 +478,11 @@ export default async function Page({
               </>
             ) : (
               <p className="empty-state">
-                Nessuna disponibilità nei prossimi 30 giorni.
+                Nessuna disponibilità per questa data.
               </p>
             )}
+            {q.waitlist?<p className="success-message">Iscrizione alla lista d’attesa registrata. Riceverai un’email se si libera un posto.</p>:null}
+            {service.waitlistEnabled&&fullCourseSlots.length?<details className="service-category waitlist-panel"><summary>Iscriviti alla lista d’attesa<span>{fullCourseSlots.length} orari completi</span></summary><div className="service-grid">{fullCourseSlots.map(slot=><form action={joinServiceWaitlist} className="compact-form stacked panel" key={`${slot.staffId}-${slot.startsAt.toISOString()}`}><input type="hidden" name="slug" value={slug}/><input type="hidden" name="serviceId" value={service.id}/><input type="hidden" name="staffId" value={slot.staffId}/><input type="hidden" name="startsAt" value={slot.startsAt.toLocaleString("sv-SE",{timeZone:b.timezone}).replace(" ","T").slice(0,16)}/><strong>{slot.startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:b.timezone})} · {slot.staffName}</strong><input name="customerName" defaultValue={session?.user.name??""} placeholder="Nome e cognome" required/><input name="email" type="email" defaultValue={session?.user.email??""} placeholder="Email" required/><input name="phone" defaultValue={profile?.phone??""} placeholder="Telefono" required/><button className="primary-button">Entra in lista d’attesa</button></form>)}</div></details>:null}
           </div>
         ) : (
           <aside className="booking-panel empty-prompt">

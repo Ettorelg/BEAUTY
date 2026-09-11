@@ -89,5 +89,17 @@ export const appointmentPayments = pgTable(
   (table) => [index("appointment_payments_appointment_idx").on(table.appointmentId)],
 );
 
+export const serviceWaitlist = pgTable("service_waitlist", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  staffId: uuid("staff_id").notNull().references(() => staffMembers.id, { onDelete: "cascade" }),
+  customerRelationId: uuid("customer_relation_id").references(() => customerRelations.id, { onDelete: "set null" }),
+  customerName: text("customer_name").notNull(), email: text("email").notNull(), phone: text("phone"),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(), status: text("status").notNull().default("WAITING"),
+  offerTokenHash: text("offer_token_hash"), offerExpiresAt: timestamp("offer_expires_at", { withTimezone: true }), offeredAt: timestamp("offered_at", { withTimezone: true }), confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("service_waitlist_slot_idx").on(table.businessId, table.serviceId, table.staffId, table.startsAt, table.status, table.createdAt)]);
+
 export const appointmentAdditionalServices=pgTable("appointment_additional_services",{id:uuid("id").primaryKey().defaultRandom(),businessId:uuid("business_id").notNull().references(()=>businesses.id,{onDelete:"cascade"}),appointmentId:uuid("appointment_id").notNull().references(()=>appointments.id,{onDelete:"cascade"}),serviceId:uuid("service_id").references(()=>services.id,{onDelete:"set null"}),serviceName:text("service_name").notNull(),durationMinutes:integer("duration_minutes").notNull(),price:text("price").notNull(),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow()},t=>[index("appointment_additional_services_appointment_idx").on(t.appointmentId)]);
 
