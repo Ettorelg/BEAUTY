@@ -22,11 +22,26 @@ async function deliverReminder(row: {
   serviceName: string;
   startsAt: Date;
   timezone: string;
+  phone: string | null;
+  whatsappEnabled: boolean;
 }) {
+  const when = row.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: row.timezone });
+  if (row.whatsappEnabled && row.phone) {
+    const token = process.env.WHATSAPP_ACCESS_TOKEN, phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID, template = process.env.WHATSAPP_REMINDER_TEMPLATE;
+    let recipient = row.phone.replace(/\D/g, "");
+    if (recipient.startsWith("00")) recipient = recipient.slice(2);
+    if (recipient.length === 10 && recipient.startsWith("3")) recipient = `${process.env.WHATSAPP_DEFAULT_COUNTRY_CODE ?? "39"}${recipient}`;
+    if (token && phoneNumberId && template && recipient) {
+      try {
+        const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? "v24.0";
+        const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: recipient, type: "template", template: { name: template, language: { code: process.env.WHATSAPP_TEMPLATE_LANGUAGE ?? "it" }, components: [{ type: "body", parameters: [row.customerName, row.businessName, row.serviceName, when].map(text => ({ type: "text", text })) }] } }) });
+        if (response.ok) return true;
+      } catch {}
+    }
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   if (!apiKey || !from || !row.email) return false;
-  const when = row.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: row.timezone });
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -64,6 +79,8 @@ export async function sendDueAppointmentReminders(now = new Date()) {
       serviceName: appointments.serviceName,
       startsAt: appointments.startsAt,
       timezone: appointments.timezone,
+      phone: customerRelations.phone,
+      whatsappEnabled: businesses.whatsappRemindersEnabled,
     })
     .from(appointments)
     .innerJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId))
