@@ -122,7 +122,7 @@ const identity = or(
     }).onConflictDoNothing({ target: [appointments.businessId, appointments.idempotencyKey] }).returning({ id: appointments.id });
     if (created) { createdAppointment = true; await tx.insert(appointmentEvents).values({ appointmentId: created.id, businessId: context.businessId, type: "CREATED", toStatus: "BOOKED", actorId: context.user.id }); }
   });
-  if (createdAppointment && email) { const [business] = await db.select({ name: businesses.name, address: businesses.address, phone: businesses.phone }).from(businesses).where(eq(businesses.id, context.businessId)).limit(1); try { await sendBookingConfirmation({ email, businessName: business?.name ?? context.businessName, serviceName: selection.serviceName, startsAt, timezone: context.timezone, address: business?.address, phone: business?.phone }); } catch { /* The booking remains valid if the mail provider is unavailable. */ } }
+  if (createdAppointment && email) { const [business] = await db.select({ name: businesses.name, address: businesses.address, phone: businesses.phone }).from(businesses).where(eq(businesses.id, context.businessId)).limit(1); try { await sendBookingConfirmation({ businessId: context.businessId, email, businessName: business?.name ?? context.businessName, serviceName: selection.serviceName, startsAt, timezone: context.timezone, address: business?.address, phone: business?.phone }); } catch { /* The booking remains valid if a notification provider is unavailable. */ } }
   revalidatePath("/app/agenda");
 }
 
@@ -265,7 +265,7 @@ export async function rescheduleAppointment(formData: FormData) {
     const [customer] = await tx.select({ email: customerRelations.email }).from(customerRelations).where(and(eq(customerRelations.id, current.customerId), eq(customerRelations.businessId, context.businessId))).limit(1);
     if (!customer?.email) throw new Error("Il cliente non ha un’email: non è possibile richiedere l’approvazione online.");
     return { customerEmail: customer.email, serviceName: current.serviceName, startsAt, endsAt, staffId: targetStaffId, version: current.version };
-  }).then(async proposal => { const request = await createRescheduleRequest({ appointmentId: input.id, businessId: context.businessId, staffId: proposal.staffId, startsAt: proposal.startsAt, endsAt: proposal.endsAt, version: proposal.version, proposerType: "STAFF", proposedBy: context.user.id }); await sendRescheduleApprovalEmail({ email: proposal.customerEmail, businessName: context.businessName, serviceName: proposal.serviceName, startsAt: proposal.startsAt, timezone: context.timezone, token: request.token! }); });
+  }).then(async proposal => { const request = await createRescheduleRequest({ appointmentId: input.id, businessId: context.businessId, staffId: proposal.staffId, startsAt: proposal.startsAt, endsAt: proposal.endsAt, version: proposal.version, proposerType: "STAFF", proposedBy: context.user.id }); await sendRescheduleApprovalEmail({ businessId: context.businessId, email: proposal.customerEmail, businessName: context.businessName, serviceName: proposal.serviceName, startsAt: proposal.startsAt, timezone: context.timezone, token: request.token! }); });
     revalidatePath("/app/agenda");
     return { ok: true as const };
   } catch (error) {

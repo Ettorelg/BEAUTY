@@ -388,6 +388,7 @@ export async function createPublicAppointment(formData: FormData) {
   });
 
   await sendBookingConfirmation({
+    businessId: selection.businessId,
     email: input.email,
     businessName: selection.businessName ?? input.slug,
     serviceName: [selection.serviceName, ...extras.map(item => item.name)].join(" + "),

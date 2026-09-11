@@ -99,7 +99,7 @@ export async function confirmWaitlistOffer(formData: FormData) {
 
   if (!result) redirect(`/waitlist-confirm/${token}?error=unavailable`);
   try {
-    await sendBookingConfirmation({ email: result.customerEmail, businessName: result.businessName, serviceName: result.serviceName, startsAt: result.startsAt, timezone: result.timezone, address: result.address, phone: result.phone });
+    await sendBookingConfirmation({ businessId: result.businessId, email: result.customerEmail, businessName: result.businessName, serviceName: result.serviceName, startsAt: result.startsAt, timezone: result.timezone, address: result.address, phone: result.phone });
   } catch {}
   redirect(`/waitlist-confirm/${token}?confirmed=1`);
 }

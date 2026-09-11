@@ -192,6 +192,7 @@ export async function sendPromotionToAllCustomers(f: FormData) {
     lastError: string | null = null;
   for (const email of emails) {
     const result = await sendPromotionEmail({
+      businessId: c.businessId,
       email,
       businessName: c.businessName,
       serviceName: promotion.serviceName,

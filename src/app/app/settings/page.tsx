@@ -33,8 +33,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <label>Token di accesso<input name="whatsappAccessToken" type="password" autoComplete="new-password" placeholder={business?.hasToken ? "Token già salvato · lascia vuoto per mantenerlo" : "Token permanente Meta"}/></label>
         <label>Template promemoria<input name="whatsappReminderTemplate" defaultValue={business?.template ?? ""} placeholder="promemoria_prenotazione"/></label>
         <label>Lingua template<input name="whatsappTemplateLanguage" defaultValue={business?.language ?? "it"}/></label>
-        <label className="checkbox-row"><input type="checkbox" name="whatsappRemindersEnabled" defaultChecked={business?.whatsappRemindersEnabled ?? false}/> Attiva i promemoria WhatsApp per questa attività</label>
-        <p className="muted">Il token viene cifrato e non sarà più mostrato. Se WhatsApp non è disponibile viene utilizzata l’email.</p>
+        <label className="checkbox-row"><input type="checkbox" name="whatsappRemindersEnabled" defaultChecked={business?.whatsappRemindersEnabled ?? false}/> Attiva le notifiche WhatsApp per questa attività</label>
+        <p className="muted">WhatsApp affianca l’email per conferme, promemoria, modifiche, assenze, promozioni e lista d’attesa. Il token viene cifrato e non sarà più mostrato.</p>
         {!process.env.WHATSAPP_CREDENTIALS_KEY ? <p className="empty-state">L’amministratore deve configurare WHATSAPP_CREDENTIALS_KEY su Railway.</p> : null}
       </div></details>
       <p className="muted">Agenda, servizi, clienti e profilo attività restano sempre disponibili.</p><button className="primary-button">Salva configurazione</button>

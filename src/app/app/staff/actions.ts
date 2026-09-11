@@ -230,7 +230,7 @@ export async function addAbsence(formData: FormData) {
     return rows;
   });
   if (input.force === "1") await Promise.allSettled(conflicts.filter(item => item.email).map(item => sendAbsenceConflictNotification({
-    email: item.email!, businessName: context.businessName, serviceName: item.serviceName, startsAt: item.startsAt, timezone: context.timezone, appointmentId: item.id,
+    businessId: context.businessId, email: item.email!, businessName: context.businessName, serviceName: item.serviceName, startsAt: item.startsAt, timezone: context.timezone, appointmentId: item.id,
   })));
   refreshStaffPages();
   revalidatePath("/app/agenda");

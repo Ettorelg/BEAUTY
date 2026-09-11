@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { staffInvitations } from "@/db/schema/staff-invitations";
+import { sendBusinessWhatsApp } from "@/lib/whatsapp-notifications";
 
 const invitationLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -170,6 +171,7 @@ export async function issueStaffInvitation({
 }
 
 export async function sendBookingConfirmation({
+  businessId,
   email,
   businessName,
   serviceName,
@@ -178,6 +180,7 @@ export async function sendBookingConfirmation({
   address,
   phone,
 }: {
+  businessId: string;
   email: string;
   businessName: string;
   serviceName: string;
@@ -188,13 +191,14 @@ export async function sendBookingConfirmation({
 }) {
   const apiKey = process.env.RESEND_API_KEY,
     from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return;
   const when = startsAt.toLocaleString("it-IT", {
     dateStyle: "long",
     timeStyle: "short",
     timeZone: timezone,
   });
   const contacts = [address, phone].filter(Boolean).join(" · ");
+  await sendBusinessWhatsApp({ businessId, kind: "CONFIRMATION", email, parameters: [businessName, serviceName, when] });
+  if (!apiKey || !from || !email) return;
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -210,6 +214,7 @@ export async function sendBookingConfirmation({
   });
 }
 export async function sendAbsenceConflictNotification({
+  businessId,
   email,
   businessName,
   serviceName,
@@ -217,6 +222,7 @@ export async function sendAbsenceConflictNotification({
   timezone,
   appointmentId,
 }: {
+  businessId: string;
   email: string;
   businessName: string;
   serviceName: string;
@@ -226,12 +232,13 @@ export async function sendAbsenceConflictNotification({
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return false;
   const when = startsAt.toLocaleString("it-IT", {
     dateStyle: "long",
     timeStyle: "short",
     timeZone: timezone,
   });
+  const whatsappSent = await sendBusinessWhatsApp({ businessId, kind: "ABSENCE", email, parameters: [businessName, serviceName, when] });
+  if (!apiKey || !from || !email) return whatsappSent;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -247,9 +254,10 @@ export async function sendAbsenceConflictNotification({
       text: `È sopraggiunta un’indisponibilità dell’operatore per ${serviceName} presso ${businessName}, previsto ${when}. Il salone ti contatterà per concordare un nuovo orario. La prenotazione non è stata cancellata automaticamente.`,
     }),
   });
-  return response.ok;
+  return response.ok || whatsappSent;
 }
 export async function sendRescheduleApprovalEmail({
+  businessId,
   email,
   businessName,
   serviceName,
@@ -257,6 +265,7 @@ export async function sendRescheduleApprovalEmail({
   timezone,
   token,
 }: {
+  businessId: string;
   email: string;
   businessName: string;
   serviceName: string;
@@ -266,7 +275,6 @@ export async function sendRescheduleApprovalEmail({
 }) {
   const apiKey = process.env.RESEND_API_KEY,
     from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return false;
   const base = (
     process.env.BETTER_AUTH_URL ??
     process.env.APP_URL ??
@@ -278,6 +286,8 @@ export async function sendRescheduleApprovalEmail({
       timeStyle: "short",
       timeZone: timezone,
     });
+  const whatsappSent = await sendBusinessWhatsApp({ businessId, kind: "RESCHEDULE", email, parameters: [businessName, serviceName, when, url] });
+  if (!apiKey || !from || !email) return whatsappSent;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -293,10 +303,11 @@ export async function sendRescheduleApprovalEmail({
       text: `${businessName} propone di spostare ${serviceName} al ${when}. Accetta o rifiuta: ${url}. L’appuntamento attuale resta invariato finché non accetti.`,
     }),
   });
-  return response.ok;
+  return response.ok || whatsappSent;
 }
 
 export async function sendPromotionEmail({
+  businessId,
   email,
   businessName,
   serviceName,
@@ -306,6 +317,7 @@ export async function sendPromotionEmail({
   timezone,
   promotionId,
 }: {
+  businessId: string;
   email: string;
   businessName: string;
   serviceName: string;
@@ -317,8 +329,6 @@ export async function sendPromotionEmail({
 }) {
   const apiKey = process.env.RESEND_API_KEY,
     from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from)
-    return { sent: false, error: "Servizio email non configurato su Railway." };
   const start = startsAt.toLocaleString("it-IT", {
       dateStyle: "long",
       timeStyle: "short",
@@ -329,6 +339,8 @@ export async function sendPromotionEmail({
       timeStyle: "short",
       timeZone: timezone,
     });
+  const whatsappSent = await sendBusinessWhatsApp({ businessId, kind: "PROMOTION", email, parameters: [businessName, serviceName, `${discountPercent}%`, `${start} – ${end}`] });
+  if (!apiKey || !from) return whatsappSent ? { sent: true, error: null } : { sent: false, error: "Email e WhatsApp non disponibili per questo cliente." };
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -345,17 +357,17 @@ export async function sendPromotionEmail({
         text: `${businessName}: ${discountPercent}% di sconto su ${serviceName}. Valida dal ${start} al ${end}.`,
       }),
     });
-    return response.ok
+    return response.ok || whatsappSent
       ? { sent: true, error: null }
       : { sent: false, error: `Invio non riuscito (${response.status})` };
   } catch (error) {
     return {
-      sent: false,
-      error: error instanceof Error ? error.message : "Invio non riuscito.",
+      sent: whatsappSent,
+      error: whatsappSent ? null : error instanceof Error ? error.message : "Invio non riuscito.",
     };
   }
 }
 
-export async function sendWaitlistOfferEmail({email,businessName,serviceName,startsAt,timezone,token,expiresAt}:{email:string;businessName:string;serviceName:string;startsAt:Date;timezone:string;token:string;expiresAt:Date}){
-  const apiKey=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM_EMAIL;if(!apiKey||!from)return false;const base=(process.env.BETTER_AUTH_URL??process.env.APP_URL??"http://localhost:3000").replace(/\/$/,"");const url=`${base}/waitlist-confirm/${token}`,when=startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:timezone}),expiry=expiresAt.toLocaleString("it-IT",{dateStyle:"short",timeStyle:"short",timeZone:timezone});const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":`waitlist-${token.slice(0,16)}`},body:JSON.stringify({from,to:[email],subject:`Si è liberato un posto · ${businessName}`,html:`<div style="font-family:Arial,sans-serif;line-height:1.6"><h1>Si è liberato un posto</h1><p><strong>${escapeHtml(serviceName)}</strong> presso ${escapeHtml(businessName)}<br/>${escapeHtml(when)}</p><p><a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#6f5145;color:#fff;text-decoration:none;font-weight:700">Conferma il posto</a></p><p>L’offerta scade il ${escapeHtml(expiry)}. Dopo la scadenza il posto passerà alla persona successiva.</p></div>`,text:`Si è liberato un posto per ${serviceName} presso ${businessName}, ${when}. Conferma entro ${expiry}: ${url}`})});return response.ok;
+export async function sendWaitlistOfferEmail({businessId,email,phone,customerName,businessName,serviceName,startsAt,timezone,token,expiresAt}:{businessId:string;email:string;phone?:string|null;customerName?:string|null;businessName:string;serviceName:string;startsAt:Date;timezone:string;token:string;expiresAt:Date}){
+  const apiKey=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM_EMAIL;const base=(process.env.BETTER_AUTH_URL??process.env.APP_URL??"http://localhost:3000").replace(/\/$/,"");const url=`${base}/waitlist-confirm/${token}`,when=startsAt.toLocaleString("it-IT",{dateStyle:"long",timeStyle:"short",timeZone:timezone}),expiry=expiresAt.toLocaleString("it-IT",{dateStyle:"short",timeStyle:"short",timeZone:timezone});const whatsappSent=await sendBusinessWhatsApp({businessId,kind:"WAITLIST",email,phone,customerName,parameters:[businessName,serviceName,when,url]});if(!apiKey||!from)return whatsappSent;const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":`waitlist-${token.slice(0,16)}`},body:JSON.stringify({from,to:[email],subject:`Si è liberato un posto · ${businessName}`,html:`<div style="font-family:Arial,sans-serif;line-height:1.6"><h1>Si è liberato un posto</h1><p><strong>${escapeHtml(serviceName)}</strong> presso ${escapeHtml(businessName)}<br/>${escapeHtml(when)}</p><p><a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#6f5145;color:#fff;text-decoration:none;font-weight:700">Conferma il posto</a></p><p>L’offerta scade il ${escapeHtml(expiry)}. Dopo la scadenza il posto passerà alla persona successiva.</p></div>`,text:`Si è liberato un posto per ${serviceName} presso ${businessName}, ${when}. Conferma entro ${expiry}: ${url}`})});return response.ok||whatsappSent;
 }

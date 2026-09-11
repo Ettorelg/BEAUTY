@@ -32,6 +32,7 @@ async function deliverReminder(row: {
   whatsappTemplateLanguage: string;
 }) {
   const when = row.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: row.timezone });
+  let whatsappSent = false;
   if (row.whatsappEnabled && row.phone) {
     const phoneNumberId = row.whatsappPhoneNumberId, template = row.whatsappReminderTemplate;
     let recipient = row.phone.replace(/\D/g, "");
@@ -40,15 +41,16 @@ async function deliverReminder(row: {
     if (row.whatsappAccessTokenEncrypted && phoneNumberId && template && recipient) {
       try {
         const token = decryptWhatsAppToken(row.whatsappAccessTokenEncrypted);
-        const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? "v24.0";
+        const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? "v25.0";
         const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: recipient, type: "template", template: { name: template, language: { code: row.whatsappTemplateLanguage }, components: [{ type: "body", parameters: [row.customerName, row.businessName, row.serviceName, when].map(text => ({ type: "text", text })) }] } }) });
-        if (response.ok) return true;
+        whatsappSent = response.ok;
+        if (!response.ok) console.error("WhatsApp reminder failed", response.status, (await response.text()).slice(0, 500));
       } catch {}
     }
   }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from || !row.email) return false;
+  if (!apiKey || !from || !row.email) return whatsappSent;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -64,7 +66,7 @@ async function deliverReminder(row: {
       text: `Promemoria: il tuo appuntamento presso ${row.businessName} per ${row.serviceName} è previsto ${when}.`,
     }),
   });
-  return response.ok;
+  return response.ok || whatsappSent;
 }
 
 export function getReminderWindow(now: Date) {
