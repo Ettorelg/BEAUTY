@@ -4,7 +4,12 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { appointments, serviceCategories, services, staffServices } from "@/db/schema";
+import {
+  appointments,
+  serviceCategories,
+  services,
+  staffServices,
+} from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
 
@@ -15,10 +20,19 @@ const serviceSchema = z.object({
   description: z.string().trim().max(180).optional(),
   durationMinutes: z.coerce.number().int().min(5).max(480),
   price: z.coerce.number().min(0).max(100000),
-  repeatPrice: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().min(0).max(100000).optional()),
+  repeatPrice: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : value),
+    z.coerce.number().min(0).max(100000).optional(),
+  ),
   repeatPriceEnabled: z.coerce.boolean(),
-  repeatDurationMinutes: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().int().min(5).max(480).optional()),
+  repeatDurationMinutes: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : value),
+    z.coerce.number().int().min(5).max(480).optional(),
+  ),
   onlineBookable: z.coerce.boolean(),
+  capacity: z.coerce.number().int().min(1).max(500),
+  waitlistEnabled: z.coerce.boolean(),
+  waitlistConfirmationMinutes: z.coerce.number().int().min(15).max(10080),
 });
 
 function ownerOnly(role: string) {
@@ -32,25 +46,45 @@ function refreshServicePages() {
 }
 
 export async function createCategory(formData: FormData) {
-  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const context = await requireBusinessContext();
+  ownerOnly(context.role);
   const input = categorySchema.parse({ name: formData.get("name") });
-  await db.insert(serviceCategories).values({ businessId: context.businessId, name: input.name });
+  await db
+    .insert(serviceCategories)
+    .values({ businessId: context.businessId, name: input.name });
   revalidatePath("/app/services");
 }
 
 export async function createService(formData: FormData) {
   await ensureServicePricingSchema();
-  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const context = await requireBusinessContext();
+  ownerOnly(context.role);
   const input = serviceSchema.parse({
     categoryId: formData.get("categoryId"),
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     durationMinutes: formData.get("durationMinutes"),
-    price: formData.get("price"), repeatPrice: formData.get("repeatPrice"), repeatPriceEnabled: formData.get("repeatPriceEnabled") === "on", repeatDurationMinutes: formData.get("repeatDurationMinutes"),
+    price: formData.get("price"),
+    repeatPrice: formData.get("repeatPrice"),
+    repeatPriceEnabled: formData.get("repeatPriceEnabled") === "on",
+    repeatDurationMinutes: formData.get("repeatDurationMinutes"),
     onlineBookable: formData.get("onlineBookable") === "on",
+    capacity: formData.get("capacity") || 1,
+    waitlistEnabled: formData.get("waitlistEnabled") === "on",
+    waitlistConfirmationMinutes:
+      formData.get("waitlistConfirmationMinutes") || 120,
   });
-  const [category] = await db.select({ id: serviceCategories.id }).from(serviceCategories)
-    .where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.businessId, context.businessId), eq(serviceCategories.active, true))).limit(1);
+  const [category] = await db
+    .select({ id: serviceCategories.id })
+    .from(serviceCategories)
+    .where(
+      and(
+        eq(serviceCategories.id, input.categoryId),
+        eq(serviceCategories.businessId, context.businessId),
+        eq(serviceCategories.active, true),
+      ),
+    )
+    .limit(1);
   if (!category) throw new Error("Categoria non valida.");
   await db.insert(services).values({
     businessId: context.businessId,
@@ -63,37 +97,87 @@ export async function createService(formData: FormData) {
     repeatPriceEnabled: input.repeatPriceEnabled && input.repeatPrice != null,
     repeatDurationMinutes: input.repeatDurationMinutes ?? null,
     onlineBookable: input.onlineBookable,
+    capacity: input.capacity,
+    waitlistEnabled: input.waitlistEnabled,
+    waitlistConfirmationMinutes: input.waitlistConfirmationMinutes,
   });
   refreshServicePages();
 }
 
 export async function updateService(formData: FormData) {
   await ensureServicePricingSchema();
-  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const context = await requireBusinessContext();
+  ownerOnly(context.role);
   const input = serviceSchema.extend({ id: z.string().uuid() }).parse({
-    id: formData.get("id"), categoryId: formData.get("categoryId"), name: formData.get("name"),
-    description: formData.get("description") || undefined, durationMinutes: formData.get("durationMinutes"),
-    price: formData.get("price"), repeatPrice: formData.get("repeatPrice"), repeatPriceEnabled: formData.get("repeatPriceEnabled") === "on", repeatDurationMinutes: formData.get("repeatDurationMinutes"), onlineBookable: formData.get("onlineBookable") === "on",
+    id: formData.get("id"),
+    categoryId: formData.get("categoryId"),
+    name: formData.get("name"),
+    description: formData.get("description") || undefined,
+    durationMinutes: formData.get("durationMinutes"),
+    price: formData.get("price"),
+    repeatPrice: formData.get("repeatPrice"),
+    repeatPriceEnabled: formData.get("repeatPriceEnabled") === "on",
+    repeatDurationMinutes: formData.get("repeatDurationMinutes"),
+    onlineBookable: formData.get("onlineBookable") === "on",
+    capacity: formData.get("capacity") || 1,
+    waitlistEnabled: formData.get("waitlistEnabled") === "on",
+    waitlistConfirmationMinutes:
+      formData.get("waitlistConfirmationMinutes") || 120,
   });
-  const [category] = await db.select({ id: serviceCategories.id }).from(serviceCategories)
-    .where(and(eq(serviceCategories.id, input.categoryId), eq(serviceCategories.businessId, context.businessId), eq(serviceCategories.active, true))).limit(1);
+  const [category] = await db
+    .select({ id: serviceCategories.id })
+    .from(serviceCategories)
+    .where(
+      and(
+        eq(serviceCategories.id, input.categoryId),
+        eq(serviceCategories.businessId, context.businessId),
+        eq(serviceCategories.active, true),
+      ),
+    )
+    .limit(1);
   if (!category) throw new Error("Categoria non valida.");
-  await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, price: input.price.toFixed(2), repeatPrice: input.repeatPrice?.toFixed(2) ?? null, repeatPriceEnabled: input.repeatPriceEnabled && input.repeatPrice != null, repeatDurationMinutes: input.repeatDurationMinutes ?? null, onlineBookable: input.onlineBookable, updatedAt: new Date() })
-    .where(and(eq(services.id, input.id), eq(services.businessId, context.businessId)));
+  await db
+    .update(services)
+    .set({
+      name: input.name,
+      description: input.description ?? null,
+      durationMinutes: input.durationMinutes,
+      price: input.price.toFixed(2),
+      repeatPrice: input.repeatPrice?.toFixed(2) ?? null,
+      repeatPriceEnabled: input.repeatPriceEnabled && input.repeatPrice != null,
+      repeatDurationMinutes: input.repeatDurationMinutes ?? null,
+      onlineBookable: input.onlineBookable,
+      capacity: input.capacity,
+      waitlistEnabled: input.waitlistEnabled,
+      waitlistConfirmationMinutes: input.waitlistConfirmationMinutes,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(services.id, input.id),
+        eq(services.businessId, context.businessId),
+      ),
+    );
   refreshServicePages();
 }
 
 export async function deleteService(formData: FormData) {
-  const context = await requireBusinessContext(); ownerOnly(context.role);
+  const context = await requireBusinessContext();
+  ownerOnly(context.role);
   const id = z.string().uuid().parse(formData.get("id"));
-  await db.delete(staffServices).where(and(eq(staffServices.serviceId, id), eq(staffServices.businessId, context.businessId)));
-  await db.update(services).set({ active: false, onlineBookable: false, updatedAt: new Date() })
-    .where(and(eq(services.id, id), eq(services.businessId, context.businessId)));
+  await db
+    .delete(staffServices)
+    .where(
+      and(
+        eq(staffServices.serviceId, id),
+        eq(staffServices.businessId, context.businessId),
+      ),
+    );
+  await db
+    .update(services)
+    .set({ active: false, onlineBookable: false, updatedAt: new Date() })
+    .where(
+      and(eq(services.id, id), eq(services.businessId, context.businessId)),
+    );
   refreshServicePages();
 }
-
-
-
-
-
-

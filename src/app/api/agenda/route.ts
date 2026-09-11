@@ -8,6 +8,7 @@ import { ensurePaymentSchema } from "@/lib/ensure-payment-schema";
 import { ensureRescheduleSchema } from "@/lib/ensure-reschedule-schema";
 import { ensureInventorySchema } from "@/lib/ensure-inventory-schema";
 import { ensureAdditionalServicesSchema } from "@/lib/ensure-additional-services-schema";
+import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
 import { addCalendarDays, addCalendarMonths, addCalendarYears, startOfCalendarMonth, startOfCalendarWeek, startOfCalendarYear, type AgendaView } from "@/modules/agenda/domain/calendar";
 import { zonedLocalToUtc } from "@/modules/availability/domain/timezone";
 
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
   const context = await requireBusinessContext();
   if(context.modules.includes("INVENTORY")) await ensureInventorySchema();
   await ensureAdditionalServicesSchema();
+  await ensureServicePricingSchema();
   const isOwner = context.role === "OWNER";
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: context.timezone }).format(new Date());
   const requestedDate = request.nextUrl.searchParams.get("date") ?? today;
