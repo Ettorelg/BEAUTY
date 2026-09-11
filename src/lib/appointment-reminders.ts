@@ -1,6 +1,8 @@
 import { and, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import { appointments, businesses, customerRelations } from "@/db/schema";
+import { decryptWhatsAppToken } from "@/lib/whatsapp-credentials";
+import { ensureBusinessSettingsSchema } from "@/lib/ensure-business-settings-schema";
 
 let workerStarted = false;
 
@@ -24,17 +26,22 @@ async function deliverReminder(row: {
   timezone: string;
   phone: string | null;
   whatsappEnabled: boolean;
+  whatsappPhoneNumberId: string | null;
+  whatsappAccessTokenEncrypted: string | null;
+  whatsappReminderTemplate: string | null;
+  whatsappTemplateLanguage: string;
 }) {
   const when = row.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: row.timezone });
   if (row.whatsappEnabled && row.phone) {
-    const token = process.env.WHATSAPP_ACCESS_TOKEN, phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID, template = process.env.WHATSAPP_REMINDER_TEMPLATE;
+    const phoneNumberId = row.whatsappPhoneNumberId, template = row.whatsappReminderTemplate;
     let recipient = row.phone.replace(/\D/g, "");
     if (recipient.startsWith("00")) recipient = recipient.slice(2);
     if (recipient.length === 10 && recipient.startsWith("3")) recipient = `${process.env.WHATSAPP_DEFAULT_COUNTRY_CODE ?? "39"}${recipient}`;
-    if (token && phoneNumberId && template && recipient) {
+    if (row.whatsappAccessTokenEncrypted && phoneNumberId && template && recipient) {
       try {
+        const token = decryptWhatsAppToken(row.whatsappAccessTokenEncrypted);
         const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? "v24.0";
-        const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: recipient, type: "template", template: { name: template, language: { code: process.env.WHATSAPP_TEMPLATE_LANGUAGE ?? "it" }, components: [{ type: "body", parameters: [row.customerName, row.businessName, row.serviceName, when].map(text => ({ type: "text", text })) }] } }) });
+        const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: recipient, type: "template", template: { name: template, language: { code: row.whatsappTemplateLanguage }, components: [{ type: "body", parameters: [row.customerName, row.businessName, row.serviceName, when].map(text => ({ type: "text", text })) }] } }) });
         if (response.ok) return true;
       } catch {}
     }
@@ -69,6 +76,7 @@ export function getReminderWindow(now: Date) {
 }
 
 export async function sendDueAppointmentReminders(now = new Date()) {
+  await ensureBusinessSettingsSchema();
   const { from, to } = getReminderWindow(now);
   const due = await db
     .select({
@@ -81,6 +89,10 @@ export async function sendDueAppointmentReminders(now = new Date()) {
       timezone: appointments.timezone,
       phone: customerRelations.phone,
       whatsappEnabled: businesses.whatsappRemindersEnabled,
+      whatsappPhoneNumberId: businesses.whatsappPhoneNumberId,
+      whatsappAccessTokenEncrypted: businesses.whatsappAccessTokenEncrypted,
+      whatsappReminderTemplate: businesses.whatsappReminderTemplate,
+      whatsappTemplateLanguage: businesses.whatsappTemplateLanguage,
     })
     .from(appointments)
     .innerJoin(customerRelations, eq(customerRelations.id, appointments.customerRelationId))
