@@ -21,6 +21,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     {query.whatsapp === "connected" ? <p className="success-message">Account WhatsApp collegato correttamente.</p> : null}
     {query.whatsapp === "test-sent" ? <p className="success-message">Messaggio WhatsApp di prova inviato.</p> : null}
     {query.whatsapp === "test-error" ? <p className="error-message">Messaggio WhatsApp non inviato. Controlla numero, token e approvazione del template.</p> : null}
+    {query.whatsapp === "incomplete" ? <p className="error-message">Prima collega WhatsApp Business oppure inserisci ID numero, token e template. Poi potrai attivare i promemoria.</p> : null}
     {query.whatsapp === "error" ? <p className="error-message">Collegamento WhatsApp non completato. Riprova o controlla la configurazione Meta.</p> : null}
     <section className="panel"><form action={saveBusinessSettings} className="compact-form stacked">
       <label>Tipo di attività<select name="businessType" defaultValue={context.businessType}>{BUSINESS_TYPES.map(type => <option key={type} value={type}>{BUSINESS_TYPE_LABELS[type]}</option>)}</select></label>
