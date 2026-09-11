@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import Image from "next/image";
+import Link from "next/link";
 import "./globals.css";
 import { PwaInstallButton } from "./pwa-install";
 
@@ -25,6 +27,8 @@ function SiteFooter() {
   </footer>;
 }
 
+function ProductBrandBar(){return <div className="product-brand-bar"><Link href="/" aria-label="Alpha Prenota - pagina iniziale"><Image src="/brand/alpha-prenota-logo-v1.png" width={116} height={39} alt="Alpha Prenota" priority/><span aria-hidden="true"/><strong>Software prenotazioni</strong></Link></div>}
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="it"><body>{children}<SiteFooter /></body></html>;
+  return <html lang="it"><body><ProductBrandBar/>{children}<SiteFooter /></body></html>;
 }

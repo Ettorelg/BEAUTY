@@ -11,8 +11,8 @@
 .agenda-view-switch button, .agenda-icon-button { min-height:34px; border:0; border-radius:8px; padding:5px 10px; background:transparent; color:#5f554f; font-size:.82rem; font-weight:700; }
 .agenda-view-switch button.active { background: white; color: var(--accent); box-shadow: 0 2px 8px #32241d17; }
 .agenda-icon-button { border: 1px solid #e4ddd8; background: white; font-size: 1.15rem; }
-.agenda-scroll { overflow:auto; height:calc(100dvh - 171px); max-height:none; border:1px solid #e4ddd8; border-radius:12px; background:white; }
-.agenda-shell .week-calendar,.agenda-shell .month-calendar,.agenda-shell .year-calendar { min-height:calc(100dvh - 171px); }
+.agenda-scroll { overflow:auto; height:calc(100dvh - 209px); max-height:none; border:1px solid #e4ddd8; border-radius:12px; background:white; }
+.agenda-shell .week-calendar,.agenda-shell .month-calendar,.agenda-shell .year-calendar { min-height:calc(100dvh - 209px); }
 .day-calendar { display:grid; min-width:0; }
 .calendar-corner, .staff-heading { position: sticky; top: 0; z-index: 3; padding: 14px 12px; border-bottom: 1px solid #ddd3cd; background: #f4efec; font-weight: 800; text-align: center; }
 .calendar-corner { left: 0; z-index: 4; color: #756a65; }
@@ -155,7 +155,7 @@
   .agenda-toolbar { gap:10px; padding:10px; }
   .agenda-toolbar h2 { font-size:1.25rem; }
   .agenda-view-switch button, .agenda-icon-button { padding:8px 10px; }
-  .agenda-scroll { height:calc(100dvh - 155px); max-height:none; }
+  .agenda-scroll { height:calc(100dvh - 193px); max-height:none; }
   .day-calendar { min-width:0; }
   .staff-heading { padding:11px 6px; overflow-wrap:anywhere; }
   .calendar-cell { padding:4px; }
@@ -179,7 +179,7 @@
   .agenda-view-switch { max-width: 100%; overflow-x: auto; }
   .agenda-view-switch button, .agenda-icon-button { min-height: 44px; padding: 8px 10px; }
   .new-booking-fab { right: 16px; bottom: 16px; }
-  .agenda-scroll { height:calc(100dvh - 205px); max-height:none; border-radius:10px; }
+  .agenda-scroll { height:calc(100dvh - 243px); max-height:none; border-radius:10px; }
   .day-calendar { min-width: 0 !important; }
   .calendar-row { min-height: 46px; }
   .calendar-row time { padding: 7px 6px; font-size: .7rem; }
