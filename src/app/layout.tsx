@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Alpha Prenota" },
   icons: { apple: "/pwa/icon-192.png" },
-  other: { "facebook-domain-verification": "91hpthoy5883ej1og6a3bfwsmdhhvc" },
+  other: { "facebook-domain-verification": "45ojxvyavx8k0nnaypp7s5bej94r01" },
 };
 
 export const viewport: Viewport = { themeColor: "#6f5145" };
