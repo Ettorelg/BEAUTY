@@ -119,11 +119,20 @@
 .agenda-extra-service .muted { margin:0; font-size:.72rem; }
 .agenda-inline-panel { position:static!important; grid-column:1/-1; width:auto!important; margin-top:5px; }
 .agenda-appointment { cursor:pointer; }
-.agenda-booking-modal { position:fixed; z-index:90; top:50%; left:50%; width:min(720px,calc(100vw - 30px)); max-height:calc(100vh - 30px); overflow-y:auto; transform:translate(-50%,-50%); padding:22px; box-shadow:0 24px 80px #21171266; cursor:default; }
+.agenda-booking-modal { position:fixed; z-index:90; top:50%; left:50%; width:min(620px,calc(100vw - 30px)); max-height:calc(100vh - 30px); overflow-y:auto; transform:translate(-50%,-50%); gap:7px; padding:14px; border-radius:15px; box-shadow:0 24px 80px #21171266; cursor:default; }
 .agenda-booking-modal .agenda-products-panel { position:static; width:auto; max-height:none; overflow:visible; transform:none; box-shadow:none; }
-.agenda-modal-section { border:1px solid #ded2cb; border-radius:11px; padding:11px; }
-.agenda-modal-section > summary { cursor:pointer; color:#5b4338; font-weight:850; }
-.agenda-modal-status { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding-top:12px; border-top:1px solid #eee5e0; }
+.agenda-modal-section { border:1px solid #e3d9d3; border-radius:9px; padding:0; overflow:hidden; background:#fff; }
+.agenda-modal-section > summary { min-height:38px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; list-style:none; padding:7px 10px; color:#5b4338; font-size:.82rem; font-weight:850; }
+.agenda-modal-section > summary::-webkit-details-marker { display:none; }
+.agenda-modal-section > summary::after { content:"＋"; width:23px; height:23px; display:grid; place-items:center; border-radius:50%; background:#f2ece8; font-size:.86rem; }
+.agenda-modal-section[open] > summary { border-bottom:1px solid #eee5e0; }
+.agenda-modal-section[open] > summary::after { content:"−"; }
+.agenda-modal-section > form,.agenda-modal-section > .agenda-price-editor,.agenda-modal-section > .agenda-extra-service,.agenda-modal-section > .agenda-products-panel { margin:0!important; padding:10px!important; border:0!important; }
+.agenda-booking-modal .compact-form.stacked { gap:7px; }
+.agenda-booking-modal input,.agenda-booking-modal select,.agenda-booking-modal textarea { min-height:36px; padding:6px 9px; }
+.agenda-booking-modal .primary-button,.agenda-booking-modal .ghost-button { min-height:36px; padding:7px 11px; border-radius:9px; font-size:.82rem; }
+.agenda-modal-status { display:grid; grid-template-columns:1fr 1fr; gap:7px; padding-top:7px; border-top:1px solid #eee5e0; }
+.agenda-modal-status button { min-height:38px; font-size:.82rem; }
 .agenda-completion-note.agenda-inline-panel { position:fixed!important; z-index:95; top:50%; left:50%; right:auto; width:min(430px,calc(100vw - 30px))!important; transform:translate(-50%,-50%); box-shadow:0 24px 80px #21171266; }
 .agenda-stock-empty { display:grid; gap:7px; padding:12px; border-radius:10px; background:#fff4dc; color:#604b28; }
 .agenda-stock-empty p { margin:0; font-size:.76rem; }
