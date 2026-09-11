@@ -1,13 +1,18 @@
 .legacy-agenda { display: none; }
-.agenda-shell { width:calc(100% - 24px); max-width:none; padding-top:24px; padding-bottom:120px; }
-.agenda-toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; margin-bottom: 18px; padding: 14px; border: 1px solid #e4ddd8; border-radius: 16px; background: white; }
-.agenda-toolbar h2 { margin: 0; font-family: Georgia, serif; text-align: center; text-transform: capitalize; }
+.agenda-shell { width:calc(100% - 16px); max-width:none; min-height:100dvh; padding:8px 0 6px; }
+.agenda-shell .app-header { min-height:52px; margin-bottom:7px; padding:6px 10px; }
+.agenda-page-heading { height:34px; display:flex; align-items:baseline; gap:10px; margin:0 2px 6px; }
+.agenda-page-heading h1 { margin:0; font-size:1.45rem; line-height:1; letter-spacing:-.025em; }
+.agenda-page-heading span { color:#756a65; font-size:.72rem; }
+.agenda-toolbar { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; margin-bottom:7px; padding:7px 9px; border:1px solid #e4ddd8; border-radius:12px; background:white; }
+.agenda-toolbar h2 { margin:0; font-family:Georgia,serif; font-size:1.2rem; text-align:center; text-transform:capitalize; }
 .agenda-navigation, .agenda-view-switch { display: flex; align-items: center; gap: 8px; }
 .agenda-view-switch { justify-self: end; padding: 4px; border-radius: 12px; background: #f2eeeb; }
-.agenda-view-switch button, .agenda-icon-button { min-height: 40px; border: 0; border-radius: 9px; padding: 8px 13px; background: transparent; color: #5f554f; font-weight: 700; }
+.agenda-view-switch button, .agenda-icon-button { min-height:34px; border:0; border-radius:8px; padding:5px 10px; background:transparent; color:#5f554f; font-size:.82rem; font-weight:700; }
 .agenda-view-switch button.active { background: white; color: var(--accent); box-shadow: 0 2px 8px #32241d17; }
 .agenda-icon-button { border: 1px solid #e4ddd8; background: white; font-size: 1.15rem; }
-.agenda-scroll { overflow: auto; max-height: 70vh; border: 1px solid #e4ddd8; border-radius: 18px; background: white; }
+.agenda-scroll { overflow:auto; height:calc(100dvh - 171px); max-height:none; border:1px solid #e4ddd8; border-radius:12px; background:white; }
+.agenda-shell .week-calendar,.agenda-shell .month-calendar,.agenda-shell .year-calendar { min-height:calc(100dvh - 171px); }
 .day-calendar { display: grid; min-width: 780px; }
 .calendar-corner, .staff-heading { position: sticky; top: 0; z-index: 3; padding: 14px 12px; border-bottom: 1px solid #ddd3cd; background: #f4efec; font-weight: 800; text-align: center; }
 .calendar-corner { left: 0; z-index: 4; color: #756a65; }
@@ -144,7 +149,7 @@
   .agenda-toolbar { gap:10px; padding:10px; }
   .agenda-toolbar h2 { font-size:1.25rem; }
   .agenda-view-switch button, .agenda-icon-button { padding:8px 10px; }
-  .agenda-scroll { max-height:calc(100vh - 190px); }
+  .agenda-scroll { height:calc(100dvh - 155px); max-height:none; }
   .day-calendar { min-width:700px; }
   .staff-heading { padding:11px 6px; overflow-wrap:anywhere; }
   .calendar-cell { padding:4px; }
@@ -158,14 +163,17 @@
 }
 
 @media (max-width: 760px) {
-  .agenda-shell { padding: 12px 8px 90px; }
+  .agenda-shell { width:100%; min-height:100dvh; padding:6px 7px; }
+  .agenda-shell .app-header { margin-bottom:5px; }
+  .agenda-page-heading { height:29px; margin-bottom:4px; }
+  .agenda-page-heading h1 { font-size:1.2rem; }
   .agenda-toolbar { grid-template-columns: 1fr; margin-bottom: 10px; padding: 9px; gap: 8px; }
   .agenda-toolbar h2 { grid-row: 1; font-size: 1.05rem; }
   .agenda-navigation, .agenda-view-switch { justify-self: center; }
   .agenda-view-switch { max-width: 100%; overflow-x: auto; }
   .agenda-view-switch button, .agenda-icon-button { min-height: 44px; padding: 8px 10px; }
   .new-booking-fab { right: 16px; bottom: 16px; }
-  .agenda-scroll { max-height: calc(100vh - 210px); border-radius: 12px; }
+  .agenda-scroll { height:calc(100dvh - 205px); max-height:none; border-radius:10px; }
   .day-calendar { min-width: 0 !important; }
   .calendar-row { min-height: 46px; }
   .calendar-row time { padding: 7px 6px; font-size: .7rem; }

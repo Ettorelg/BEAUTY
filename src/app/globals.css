@@ -459,6 +459,7 @@ button { cursor: pointer; }
 .site-footer nav { display: flex; justify-content: flex-end; gap: 18px; font-size: .82rem; }
 .site-footer-legal { grid-column: 1 / -1; color: #cdbeb7; font-size: .7rem; }
 .site-footer-legal a { color: inherit; font-weight: 700; }
+body:has(.agenda-shell) > .site-footer { display:none; }
 @media (max-width: 700px) {
   .salon-link-compact { align-items: stretch; flex-direction: column; }
   .salon-link-compact .button-row { display: grid; grid-template-columns: 1fr 1fr; }
