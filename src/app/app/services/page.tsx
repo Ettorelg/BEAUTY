@@ -1,6 +1,6 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { serviceCategories, services } from "@/db/schema";
+import { serviceCategories, serviceWaitlist, services, staffMembers } from "@/db/schema";
 import { requireBusinessContext } from "@/lib/business-context";
 import { ensureServicePricingSchema } from "@/lib/ensure-service-pricing-schema";
 import { AppNav } from "../app-nav";
@@ -9,6 +9,7 @@ import {
   createCategory,
   createService,
   deleteService,
+  removeWaitlistEntry,
   updateService,
 } from "./actions";
 
@@ -61,6 +62,7 @@ export default async function ServicesPage() {
     ...category,
     services: catalog.filter((service) => service.categoryId === category.id),
   }));
+  const waitlist = context.role === "OWNER" ? await db.select({ id: serviceWaitlist.id, customerName: serviceWaitlist.customerName, email: serviceWaitlist.email, phone: serviceWaitlist.phone, startsAt: serviceWaitlist.startsAt, requestedDay: serviceWaitlist.requestedDay, status: serviceWaitlist.status, offeredAt: serviceWaitlist.offeredAt, expiresAt: serviceWaitlist.offerExpiresAt, createdAt: serviceWaitlist.createdAt, serviceName: services.name, staffName: staffMembers.name }).from(serviceWaitlist).innerJoin(services, eq(services.id, serviceWaitlist.serviceId)).innerJoin(staffMembers, eq(staffMembers.id, serviceWaitlist.staffId)).where(and(eq(serviceWaitlist.businessId, context.businessId), inArray(serviceWaitlist.status, ["WAITING", "OFFERED"]))).orderBy(asc(serviceWaitlist.createdAt)).limit(100) : [];
 
   return (
     <main className="dashboard-shell">
@@ -222,6 +224,12 @@ export default async function ServicesPage() {
           </div>
         </details>
       </section>
+      {context.role === "OWNER" ? <details className="panel action-disclosure">
+        <summary><span><b>Lista d’attesa</b><small>{waitlist.length ? `${waitlist.length} richieste attive` : "Nessuna richiesta attiva"}</small></span><i>＋</i></summary>
+        <div className="action-disclosure-body">
+          {waitlist.length ? <div className="data-list">{waitlist.map(entry => <article className="data-row" key={entry.id}><div><h3>{entry.customerName}</h3><p><strong>{entry.serviceName}</strong> · {entry.requestedDay ? `giornata ${new Date(`${entry.requestedDay}T12:00:00Z`).toLocaleDateString("it-IT")}` : entry.startsAt.toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short", timeZone: context.timezone })} · {entry.staffName}</p><p className="muted">{entry.email}{entry.phone ? ` · ${entry.phone}` : ""} · {entry.status === "OFFERED" ? `offerta inviata${entry.expiresAt ? `, scade ${entry.expiresAt.toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short", timeZone: context.timezone })}` : ""}` : "in attesa"}</p></div><form action={removeWaitlistEntry}><input type="hidden" name="id" value={entry.id}/><ConfirmSubmitButton message={`Rimuovere ${entry.customerName} dalla lista d’attesa?`} className="danger-button">Rimuovi</ConfirmSubmitButton></form></article>)}</div> : <div className="empty-state">Quando un cliente si iscrive alla lista d’attesa, comparirà qui.</div>}
+        </div>
+      </details> : null}
       <section className="list-section">
         <h2>Listino per categoria</h2>
         {categorizedCatalog.length ? (

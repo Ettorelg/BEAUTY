@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import {
   appointments,
   serviceCategories,
+  serviceWaitlist,
   services,
   staffServices,
 } from "@/db/schema";
@@ -37,6 +38,15 @@ const serviceSchema = z.object({
 
 function ownerOnly(role: string) {
   if (role !== "OWNER") throw new Error("Operazione riservata al titolare.");
+}
+
+export async function removeWaitlistEntry(formData: FormData) {
+  await ensureServicePricingSchema();
+  const context = await requireBusinessContext();
+  ownerOnly(context.role);
+  const id = z.string().uuid().parse(formData.get("id"));
+  await db.update(serviceWaitlist).set({ status: "REMOVED", offerTokenHash: null, offerExpiresAt: null, updatedAt: new Date() }).where(and(eq(serviceWaitlist.id, id), eq(serviceWaitlist.businessId, context.businessId)));
+  revalidatePath("/app/services");
 }
 
 function refreshServicePages() {
