@@ -7,7 +7,7 @@ import { BUSINESS_TYPES, BUSINESS_TYPE_LABELS, MODULE_LABELS, OPTIONAL_MODULES }
 import { requireBusinessContext } from "@/lib/business-context";
 import { AppNav } from "../app-nav";
 import { LogoutButton } from "../logout-button";
-import { saveBusinessSettings } from "./actions";
+import { saveBusinessSettings, sendWhatsAppTest } from "./actions";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; whatsapp?: string }> }) {
   const context = await requireBusinessContext();
@@ -19,6 +19,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     <section className="page-heading"><div><p className="eyebrow">Personalizzazione</p><h1>Tipo di attività e funzioni</h1></div><p className="muted">Mostra solo gli strumenti utili alla tua attività.</p></section>
     {query.saved ? <p className="success-message">Configurazione salvata.</p> : null}
     {query.whatsapp === "connected" ? <p className="success-message">Account WhatsApp collegato correttamente.</p> : null}
+    {query.whatsapp === "test-sent" ? <p className="success-message">Messaggio WhatsApp di prova inviato.</p> : null}
+    {query.whatsapp === "test-error" ? <p className="error-message">Messaggio WhatsApp non inviato. Controlla numero, token e approvazione del template.</p> : null}
     {query.whatsapp === "error" ? <p className="error-message">Collegamento WhatsApp non completato. Riprova o controlla la configurazione Meta.</p> : null}
     <section className="panel"><form action={saveBusinessSettings} className="compact-form stacked">
       <label>Tipo di attività<select name="businessType" defaultValue={context.businessType}>{BUSINESS_TYPES.map(type => <option key={type} value={type}>{BUSINESS_TYPE_LABELS[type]}</option>)}</select></label>
@@ -36,6 +38,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </div></details>
       <p className="muted">Agenda, servizi, clienti e profilo attività restano sempre disponibili.</p><button className="primary-button">Salva configurazione</button>
     </form></section>
+    {whatsappConfigured ? <section className="panel"><h2>Prova il collegamento WhatsApp</h2><p className="muted">Inserisci un numero completo di prefisso internazionale. Verrà utilizzato il template configurato con dati dimostrativi.</p><form action={sendWhatsAppTest} className="compact-form form-row"><input name="recipient" type="tel" autoComplete="tel" placeholder="+39 333 1234567" required/><button className="ghost-button">Invia messaggio di prova</button></form></section> : null}
     <section className="panel"><h2>Account e accesso</h2><div className="button-row"><Link className="ghost-button link-button" href="/account/connections?next=/app/settings">Account e Google</Link><LogoutButton/></div></section>
   </main>;
 }

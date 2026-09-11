@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
@@ -26,18 +26,20 @@ function parseSessionInfo(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
   const expectedState = cookieStore.get("wa_signup_state")?.value;
+  const businessId = cookieStore.get("wa_signup_business")?.value;
   const returnedState = request.nextUrl.searchParams.get("state");
-  if (!expectedState || (returnedState && returnedState !== expectedState) || request.nextUrl.searchParams.get("error")) return failure();
+  if (!expectedState || !businessId || returnedState !== expectedState || request.nextUrl.searchParams.get("error")) return failure();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.redirect(new URL("/login", callbackUrl));
-  const [membership] = await db.select({ businessId: businessMemberships.businessId, role: businessMemberships.role }).from(businessMemberships).where(eq(businessMemberships.userId, session.user.id)).limit(1);
+  const [membership] = await db.select({ businessId: businessMemberships.businessId, role: businessMemberships.role }).from(businessMemberships).where(and(eq(businessMemberships.userId, session.user.id), eq(businessMemberships.businessId, businessId))).limit(1);
   if (!membership || membership.role !== "OWNER") return failure();
 
   const code = request.nextUrl.searchParams.get("code");
   const appId = process.env.META_APP_ID;
   const appSecret = process.env.META_APP_SECRET;
   if (!code || !appId || !appSecret) return failure();
-  const tokenUrl = new URL("https://graph.facebook.com/v23.0/oauth/access_token");
+  const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? "v24.0";
+  const tokenUrl = new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`);
   tokenUrl.searchParams.set("client_id", appId);
   tokenUrl.searchParams.set("client_secret", appSecret);
   tokenUrl.searchParams.set("redirect_uri", callbackUrl);
@@ -50,13 +52,19 @@ export async function GET(request: NextRequest) {
   const info = parseSessionInfo(request);
   let phoneNumberId = info.phoneNumberId;
   if (!phoneNumberId && info.wabaId) {
-    const phonesResponse = await fetch(`https://graph.facebook.com/v23.0/${info.wabaId}/phone_numbers?fields=id`, { headers: { Authorization: `Bearer ${tokenData.access_token}` }, cache: "no-store" });
+    const phonesResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${info.wabaId}/phone_numbers?fields=id`, { headers: { Authorization: `Bearer ${tokenData.access_token}` }, cache: "no-store" });
     if (phonesResponse.ok) {
       const phones = await phonesResponse.json() as { data?: Array<{ id: string }> };
       if (phones.data?.length === 1) phoneNumberId = phones.data[0].id;
     }
   }
   if (!phoneNumberId) return failure();
+  if (info.wabaId) {
+    await fetch(`https://graph.facebook.com/${graphVersion}/${info.wabaId}/subscribed_apps`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    }).catch(() => null);
+  }
   await ensureBusinessSettingsSchema();
   await db.update(businesses).set({
     whatsappBusinessAccountId: info.wabaId || null,
@@ -68,5 +76,6 @@ export async function GET(request: NextRequest) {
   }).where(eq(businesses.id, membership.businessId));
   const response = NextResponse.redirect(new URL("/app/settings?whatsapp=connected", callbackUrl));
   response.cookies.delete("wa_signup_state");
+  response.cookies.delete("wa_signup_business");
   return response;
 }

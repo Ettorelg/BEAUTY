@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -9,8 +10,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  // Consumiamo il payload per permettere a Meta di registrare consegne e messaggi.
-  // La gestione conversazionale verrà aggiunta solo se il titolare la abilita.
-  await request.json().catch(() => null);
+  const secret = process.env.META_APP_SECRET;
+  const signature = request.headers.get("x-hub-signature-256");
+  const payload = await request.text();
+  if (!secret || !signature?.startsWith("sha256=")) return new NextResponse("Unauthorized", { status: 401 });
+  const expected = `sha256=${createHmac("sha256", secret).update(payload).digest("hex")}`;
+  const suppliedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (suppliedBuffer.length !== expectedBuffer.length || !timingSafeEqual(suppliedBuffer, expectedBuffer)) return new NextResponse("Unauthorized", { status: 401 });
+  try { JSON.parse(payload); } catch { return new NextResponse("Bad Request", { status: 400 }); }
   return NextResponse.json({ received: true });
 }
