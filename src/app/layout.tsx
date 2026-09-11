@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
 import { PwaInstallButton } from "./pwa-install";
+import { PushNotificationButton } from "./push-notification-button";
 
 export const metadata: Metadata = {
   title: "Alpha Prenota",
@@ -22,7 +23,7 @@ export const viewport: Viewport = { themeColor: "#6f5145" };
 function SiteFooter() {
   return <footer className="site-footer">
     <div className="site-footer-inner">
-      <p className="site-footer-developer">Programma sviluppato da <a href="https://alphasystemsrl.it/" target="_blank" rel="noreferrer">Alpha System S.r.l.</a></p><PwaInstallButton className="site-install-button"/>
+      <p className="site-footer-developer">Programma sviluppato da <a href="https://alphasystemsrl.it/" target="_blank" rel="noreferrer">Alpha System S.r.l.</a></p><div className="button-row"><PwaInstallButton className="site-install-button"/><PushNotificationButton/></div>
       <nav aria-label="Informazioni legali">
         <a href="/privacy">Privacy</a>
         <a href="/terms">Termini d’uso</a>

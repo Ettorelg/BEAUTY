@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { appointments, businesses, customerRelations } from "@/db/schema";
 import { decryptWhatsAppToken } from "@/lib/whatsapp-credentials";
 import { ensureBusinessSettingsSchema } from "@/lib/ensure-business-settings-schema";
+import { sendPushToCustomer } from "@/lib/push-notifications";
 
 let workerStarted = false;
 
@@ -18,6 +19,7 @@ function escapeHtml(value: string) {
 
 async function deliverReminder(row: {
   id: string;
+  businessId: string;
   email: string | null;
   customerName: string;
   businessName: string;
@@ -32,6 +34,7 @@ async function deliverReminder(row: {
   whatsappTemplateLanguage: string;
 }) {
   const when = row.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: row.timezone });
+  const pushSent = await sendPushToCustomer({businessId:row.businessId,email:row.email,title:"Promemoria appuntamento",body:`${row.businessName} · ${row.serviceName} · ${when}`});
   let whatsappSent = false;
   if (row.whatsappEnabled && row.phone) {
     const phoneNumberId = row.whatsappPhoneNumberId, template = row.whatsappReminderTemplate;
@@ -50,7 +53,7 @@ async function deliverReminder(row: {
   }
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from || !row.email) return whatsappSent;
+  if (!apiKey || !from || !row.email) return whatsappSent || pushSent;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -66,7 +69,7 @@ async function deliverReminder(row: {
       text: `Promemoria: il tuo appuntamento presso ${row.businessName} per ${row.serviceName} è previsto ${when}.`,
     }),
   });
-  return response.ok || whatsappSent;
+  return response.ok || whatsappSent || pushSent;
 }
 
 export function getReminderWindow(now: Date) {
@@ -83,6 +86,7 @@ export async function sendDueAppointmentReminders(now = new Date()) {
   const due = await db
     .select({
       id: appointments.id,
+      businessId: appointments.businessId,
       email: customerRelations.email,
       customerName: customerRelations.name,
       businessName: businesses.name,

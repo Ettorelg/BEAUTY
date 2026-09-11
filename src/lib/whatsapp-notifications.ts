@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { businesses, customerRelations } from "@/db/schema";
 import { decryptWhatsAppToken } from "@/lib/whatsapp-credentials";
+import { sendPushToCustomer } from "@/lib/push-notifications";
 
 export type WhatsAppNotificationKind = "CONFIRMATION" | "RESCHEDULE" | "ABSENCE" | "PROMOTION" | "WAITLIST";
 
@@ -29,6 +30,8 @@ export async function sendBusinessWhatsApp(input: {
   email?: string | null;
 }) {
   try {
+    const labels: Record<WhatsAppNotificationKind,string>={CONFIRMATION:"Prenotazione confermata",RESCHEDULE:"Modifica appuntamento",ABSENCE:"Aggiornamento appuntamento",PROMOTION:"Nuova promozione",WAITLIST:"Posto disponibile"};
+    await sendPushToCustomer({businessId:input.businessId,email:input.email,title:labels[input.kind],body:input.parameters.slice(0,3).join(" · ")});
     const [business] = await db.select({
       enabled: businesses.whatsappRemindersEnabled,
       phoneNumberId: businesses.whatsappPhoneNumberId,

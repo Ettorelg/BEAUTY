@@ -8,3 +8,5 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/app/") || url.pathname === "/app") return;
   event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => { if (response.ok && ["style", "script", "image", "font"].includes(event.request.destination)) caches.open(CACHE).then((cache) => cache.put(event.request, response.clone())); return response; })));
 });
+self.addEventListener("push",event=>{const data=event.data?.json()??{};event.waitUntil(self.registration.showNotification(data.title??"Alpha Prenota",{body:data.body??"Hai una nuova notifica",icon:data.icon??"/pwa/icon-192.png",badge:"/pwa/icon-192.png",data:{url:data.url??"/account"}}));});
+self.addEventListener("notificationclick",event=>{event.notification.close();event.waitUntil(clients.matchAll({type:"window",includeUncontrolled:true}).then(list=>{const target=new URL(event.notification.data?.url??"/account",self.location.origin).href;const found=list.find(client=>client.url===target);return found?found.focus():clients.openWindow(target);}));});
