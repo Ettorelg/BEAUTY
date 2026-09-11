@@ -272,6 +272,8 @@ export default async function Page({
     staffId: items[0].staffId,
     localStart,
     label: items[0].label,
+    availableSeats: items[0].availableSeats,
+    totalAvailableSeats: items.reduce((sum, item) => sum + item.availableSeats, 0),
     operatorsLabel: staffId
       ? items[0].staffName
       : items.length > 1
@@ -495,6 +497,7 @@ export default async function Page({
                   additionalServiceIds={selectedExtraIds}
                   additionalPrice={extraPrice}
                   additionalDuration={extraDuration}
+                  showAvailableSeats={service.capacity > 1}
                 />
               </>
             ) : (

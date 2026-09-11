@@ -301,6 +301,8 @@ button { cursor: pointer; }
 .compact-service-row .edit-disclosure { margin-top: 5px; }
 .compact-service-row .edit-disclosure > summary { font-size: .78rem; }
 .compact-service-row .delete-form summary { padding: 6px 9px; font-size: .72rem; }
+.slot-seats { color: #28724a !important; font-weight: 800; }
+.slot-seats.last-seat { color: #ad542e !important; }
 .auth-professional { background: radial-gradient(circle at 15% 10%, #6f5145 0, #2a211e 42%, #151313 100%); }
 .auth-professional .auth-card { background: #fffaf7; border-color: #9b7665; }
 .auth-customer { background: radial-gradient(circle at 85% 0%, #f4d9d0 0, #fff8f5 48%, #f8eee9 100%); }

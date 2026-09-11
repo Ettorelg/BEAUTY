@@ -5,7 +5,7 @@ import { authClient } from "@/lib/auth-client";
 import { calculateBookingPriceCents } from "@/modules/fidelity/domain/booking-price";
 
 type Reward = { id: string; points: number; type: string; value: number; serviceId: string | null };
-type Slot = { staffId: string; localStart: string; label: string; operatorsLabel: string };
+type Slot = { staffId: string; localStart: string; label: string; operatorsLabel: string; availableSeats: number; totalAvailableSeats: number };
 
 const inputStyle = { minHeight: 46, padding: "10px 12px", border: "1px solid #d8cec8", borderRadius: 11, width: "100%" };
 const euro = (value: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value);
@@ -16,7 +16,7 @@ function rewardLabel(reward: Reward) {
   return `${reward.points} punti · ${euro(reward.value / 100)} di sconto`;
 }
 
-export function BookingDetailsForm({ action, slug, serviceId, slots, name, email, phone, rewards, basePrice, promotionDiscount, allowRewardStacking, additionalServiceIds, additionalPrice, additionalDuration }: {
+export function BookingDetailsForm({ action, slug, serviceId, slots, name, email, phone, rewards, basePrice, promotionDiscount, allowRewardStacking, additionalServiceIds, additionalPrice, additionalDuration, showAvailableSeats }: {
   action: (formData: FormData) => void | Promise<void>;
   slug: string;
   serviceId: string;
@@ -31,6 +31,7 @@ export function BookingDetailsForm({ action, slug, serviceId, slots, name, email
   additionalServiceIds: string[];
   additionalPrice: number;
   additionalDuration: number;
+  showAvailableSeats: boolean;
 }) {
   const [selected, setSelected] = useState("");
   const [guest, setGuest] = useState(false);
@@ -58,7 +59,7 @@ export function BookingDetailsForm({ action, slug, serviceId, slots, name, email
       <p className="eyebrow">Orari disponibili</p>
       <div className="slot-grid">{slots.map((slot) => <label className="slot" key={slot.localStart}>
         <input type="radio" name="selection" value={`${slot.staffId}|${slot.localStart}`} required onChange={() => { setSelected(slot.localStart); setGuest(false); }}/>
-        <span>{slot.label}<small>{slot.operatorsLabel}</small></span>
+        <span>{slot.label}<small>{slot.operatorsLabel}</small>{showAvailableSeats ? slot.totalAvailableSeats > 1 ? <small className="slot-seats">{slot.totalAvailableSeats} posti disponibili</small> : <small className="slot-seats last-seat">Ultimo posto disponibile</small> : null}</span>
       </label>)}</div>
     </div>
 

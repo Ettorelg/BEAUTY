@@ -21,6 +21,7 @@ export type PublicSlot = {
   staffName: string;
   localStart: string;
   label: string;
+  availableSeats: number;
 };
 
 export async function getPublicAvailability(input: {
@@ -173,6 +174,7 @@ export async function getPublicAvailability(input: {
             localStart,
             label: time,
             instant: zonedLocalToUtc(localStart, input.timezone),
+            availableSeats: Math.max(0, capacity - personBookings.filter(booking => booking.start < minutes + input.durationMinutes && booking.end > minutes).length),
           };
         })
         .filter((slot) => slot.instant > now)
@@ -181,6 +183,7 @@ export async function getPublicAvailability(input: {
           staffName: slot.staffName,
           localStart: slot.localStart,
           label: slot.label,
+          availableSeats: slot.availableSeats,
         }));
     })
     .sort(
