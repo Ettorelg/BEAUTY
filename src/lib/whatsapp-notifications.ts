@@ -31,7 +31,7 @@ export async function sendBusinessWhatsApp(input: {
 }) {
   try {
     const labels: Record<WhatsAppNotificationKind,string>={CONFIRMATION:"Prenotazione confermata",RESCHEDULE:"Modifica appuntamento",ABSENCE:"Aggiornamento appuntamento",PROMOTION:"Nuova promozione",WAITLIST:"Posto disponibile"};
-    await sendPushToCustomer({businessId:input.businessId,email:input.email,title:labels[input.kind],body:input.parameters.slice(0,3).join(" · ")});
+    await sendPushToCustomer({businessId:input.businessId,email:input.email,title:labels[input.kind],body:input.parameters.slice(0,3).join(" · ")}).catch(error=>console.error("Push notification failed",error));
     const [business] = await db.select({
       enabled: businesses.whatsappRemindersEnabled,
       phoneNumberId: businesses.whatsappPhoneNumberId,

@@ -34,7 +34,7 @@ async function deliverReminder(row: {
   whatsappTemplateLanguage: string;
 }) {
   const when = row.startsAt.toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short", timeZone: row.timezone });
-  const pushSent = await sendPushToCustomer({businessId:row.businessId,email:row.email,title:"Promemoria appuntamento",body:`${row.businessName} · ${row.serviceName} · ${when}`});
+  const pushSent = await sendPushToCustomer({businessId:row.businessId,email:row.email,title:"Promemoria appuntamento",body:`${row.businessName} · ${row.serviceName} · ${when}`}).catch(error=>{console.error("Push reminder failed",error);return false;});
   let whatsappSent = false;
   if (row.whatsappEnabled && row.phone) {
     const phoneNumberId = row.whatsappPhoneNumberId, template = row.whatsappReminderTemplate;

@@ -23,6 +23,7 @@ body {
 .product-brand-bar img { width:108px; height:30px; object-fit:contain; }
 .product-brand-bar a > span { width:1px; height:18px; background:#d8d8da; }
 .product-brand-bar strong { font-size:.76rem; letter-spacing:.01em; }
+.push-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px}.push-controls>span{font-size:.8rem}
 
 main {
   width: min(720px, calc(100% - 32px));

@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { customerRelations } from "@/db/schema";
 
@@ -10,10 +10,15 @@ export async function ensurePushSchema() {
 
 export async function sendPushToCustomer(input: { businessId: string; email?: string | null; title: string; body: string; url?: string }) {
   if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !input.email) return false;
-  await ensurePushSchema();
-  const [customer] = await db.select({ userId: customerRelations.userId }).from(customerRelations).where(and(eq(customerRelations.businessId, input.businessId), eq(customerRelations.email, input.email.toLowerCase()))).limit(1);
+  const [customer] = await db.select({ userId: customerRelations.userId }).from(customerRelations).where(and(eq(customerRelations.businessId, input.businessId), eq(customerRelations.email, input.email.toLowerCase()), isNotNull(customerRelations.userId))).limit(1);
   if (!customer?.userId) return false;
-  const subscriptions = await db.execute(sql`select endpoint, p256dh, auth from push_subscriptions where user_id = ${customer.userId}`);
+  return sendPushToUser({userId:customer.userId,title:input.title,body:input.body,url:input.url});
+}
+
+export async function sendPushToUser(input:{userId:string;title:string;body:string;url?:string}){
+  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return false;
+  await ensurePushSchema();
+  const subscriptions = await db.execute(sql`select endpoint, p256dh, auth from push_subscriptions where user_id = ${input.userId}`);
   webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? "mailto:privacy@alphasystemsrl.it", process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
   let sent = false;
   for (const item of subscriptions.rows as Array<{endpoint:string;p256dh:string;auth:string}>) {
@@ -22,6 +27,7 @@ export async function sendPushToCustomer(input: { businessId: string; email?: st
       sent = true;
     } catch (error) {
       const status = (error as { statusCode?: number }).statusCode;
+      console.error("Push delivery failed",status ?? "unknown",error instanceof Error ? error.message : error);
       if (status === 404 || status === 410) await db.execute(sql`delete from push_subscriptions where endpoint = ${item.endpoint}`);
     }
   }
